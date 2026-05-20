@@ -270,6 +270,39 @@
       margin-bottom: 14px;
     }
 
+    /* ── GDPR consent ── */
+    .gdpr-box {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      background: var(--accent-light);
+      border-radius: 10px;
+      padding: 13px 14px;
+      margin-bottom: 14px;
+    }
+    .gdpr-box input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      min-width: 18px;
+      margin-top: 2px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .gdpr-box label {
+      font-size: 12.5px;
+      color: var(--muted);
+      line-height: 1.5;
+      cursor: pointer;
+    }
+    .gdpr-box.has-err { outline: 2px solid var(--error); }
+    .gdpr-err {
+      font-size: 12px;
+      color: var(--error);
+      margin-top: 5px;
+      display: none;
+    }
+    .gdpr-box.has-err + .gdpr-err { display: block; }
+
     /* ── Buttons ── */
     .btn {
       width: 100%;
@@ -385,15 +418,7 @@
         <textarea id="inp-problem"></textarea>
         <div class="err-msg" data-t="errRequired"></div>
       </div>
-      <div class="field">
-        <label><span data-t="labelSessionType"></span></label>
-        <select id="inp-type">
-          <option value=""   data-t="typeDefault"></option>
-          <option value="first"      data-t="typeFirst"></option>
-          <option value="individual" data-t="typeIndividual"></option>
-          <option value="couples"    data-t="typeCouples"></option>
-        </select>
-      </div>
+      <input type="hidden" id="inp-type" value="individual">
     </div>
 
     <div class="card">
@@ -411,6 +436,12 @@
         <div id="slots-container"></div>
       </div>
     </div>
+
+    <div class="gdpr-box" id="gdpr-box">
+      <input type="checkbox" id="inp-gdpr">
+      <label for="inp-gdpr" id="gdpr-label"></label>
+    </div>
+    <div class="gdpr-err" id="gdpr-err"></div>
 
     <button class="btn btn-primary" onclick="submitForm()" id="btn-submit">
       <span data-t="btnContinue"></span>
@@ -460,18 +491,18 @@
 // ╚══════════════════════════════════════════════════════════╝
 const CONFIG = {
   // Therapist identity
-  therapistName:     "Anna Kowalska",
+  therapistName:     "Psycholog Alina Szaputko",
   therapistPhotoUrl: "",           // URL to a photo, or "" to show emoji
   therapistEmoji:    "🌿",
 
   welcomeText: {
     pl: "Zapraszam na sesję. Umów się w kilka minut.",
-    ru: "Приглашаю вас на сессию. Запишитесь за несколько минут.",
+    ru: "Приглашаю тебя на сессию. Запишись за несколько минут.",
   },
 
   // Session settings
-  sessionDurationMinutes: 50,
-  sessionPrice:           150,
+  sessionDurationMinutes: 60,
+  sessionPrice:           160,
   currency:               "PLN",
 
   // Working hours (24-h format) and days (0=Sun, 1=Mon … 6=Sat)
@@ -480,19 +511,19 @@ const CONFIG = {
 
   // Stripe ─ create a Payment Link in your Stripe dashboard,
   //   set its Success URL to: https://yoursite.com/booking.html?status=paid
-  stripePaymentLinkUrl: "https://buy.stripe.com/REPLACE_ME",
+  stripePaymentLinkUrl: "https://buy.stripe.com/00wdRbeGN8Nj4Dwb3hc7u00",
 
   // Google Calendar ─ create an API key in Google Cloud Console,
   //   restrict it to the Calendar API. Your calendar must be PUBLIC
   //   (Calendar settings → Share with specific people → Make available to public).
-  googleApiKey:      "REPLACE_ME",
-  googleCalendarId:  "your@gmail.com",
+  googleApiKey:      "AIzaSyDsQxcHMTOj_eTKWpyJV5zJ4hSS5_PT1Vw",
+  googleCalendarId:  "gorbachovaalina@gmail.com",
 
   // EmailJS ─ sign up at emailjs.com (free), create a service + template
   emailjsPublicKey:  "REPLACE_ME",
   emailjsServiceId:  "REPLACE_ME",
   emailjsTemplateId: "REPLACE_ME",
-  therapistEmail:    "your@gmail.com",  // receives booking notifications
+  therapistEmail:    "gorbachovaalina@gmail.com",  // receives booking notifications
 
   defaultLanguage: "pl",
 };
@@ -517,10 +548,8 @@ const T = {
     labelPrice:       "Do zapłaty",
 
     typeDefault:    "— wybierz —",
-    typeFirst:      "Pierwsza konsultacja",
-    typeIndividual: "Terapia indywidualna",
-    typeCouples:    "Terapia par",
-
+    typeFirst:      "Konsultacja indywidualna",
+  
     errRequired: "To pole jest wymagane.",
     errEmail:    "Podaj prawidłowy adres e-mail.",
 
@@ -543,6 +572,9 @@ const T = {
     slotsLoading: "Sprawdzam dostępność…",
     slotsNone:    "Brak wolnych terminów tego dnia. Wybierz inny dzień.",
 
+    gdprText: "Wyrażam zgodę na przetwarzanie moich danych osobowych (w tym danych dotyczących zdrowia psychicznego) przez Alinę Szaputko wyłącznie w celu realizacji sesji psychologicznej. Dane nie będą udostępniane osobom trzecim. Zgoda jest dobrowolna i można ją wycofać w każdej chwili, pisząc na adres: gorbachovaalina@gmail.com",
+    gdprErr:  "Prosimy o wyrażenie zgody na przetwarzanie danych, aby kontynuować.",
+
     monthNames: ["Styczeń","Luty","Marzec","Kwiecień","Maj","Czerwiec",
                  "Lipiec","Sierpień","Wrzesień","Październik","Listopad","Grudzień"],
     dayNamesShort: ["Nd","Pn","Wt","Śr","Cz","Pt","Sb"],
@@ -551,26 +583,24 @@ const T = {
 
   ru: {
     pageTitle:       "Запись на сессию",
-    sectionPersonal: "Ваши данные",
+    sectionPersonal: "Твои данные",
     sectionSession:  "О сессии",
-    sectionDateTime: "Выберите дату и время",
+    sectionDateTime: "Выбери дату и время",
     sectionPayment:  "Сводка и оплата",
 
     labelName:        "Имя и фамилия",
     labelEmail:       "Электронная почта",
     labelPhone:       "Номер телефона (необязательно)",
-    labelProblem:     "Над чем вы хотите поработать?",
+    labelProblem:     "Над чем ты хочешь поработать?",
     labelSessionType: "Тип сессии (необязательно)",
-    labelTime:        "Выберите время",
+    labelTime:        "Выбери время",
     labelPrice:       "К оплате",
 
-    typeDefault:    "— выберите —",
-    typeFirst:      "Первичная консультация",
-    typeIndividual: "Индивидуальная терапия",
-    typeCouples:    "Терапия пар",
-
+    typeDefault:    "— выбери —",
+    typeFirst:      "Индивидуальная консультация",
+   
     errRequired: "Это поле обязательно.",
-    errEmail:    "Введите корректный адрес электронной почты.",
+    errEmail:    "Введи корректный адрес электронной почты.",
 
     btnContinue:    "Перейти к оплате →",
     btnPay:         "Оплатить безопасно онлайн",
@@ -578,9 +608,9 @@ const T = {
     btnAddCal:      "Добавить в Google Календарь",
     btnBookAnother: "Записаться ещё раз",
 
-    paymentNotice:  "Вы будете перенаправлены на защищённую страницу оплаты Stripe.",
+    paymentNotice:  "Сейчас тебя перенаправит на защищённую страницу оплаты Stripe.",
     confirmTitle:   "Спасибо за запись!",
-    confirmSubMsg:  "Подтверждение отправлено на вашу электронную почту.",
+    confirmSubMsg:  "Подтверждение отправлено на твою электронную почту.",
 
     summaryDate:     "Дата",
     summaryTime:     "Время",
@@ -589,7 +619,10 @@ const T = {
     summaryMinutes:  "минут",
 
     slotsLoading: "Проверяю доступность…",
-    slotsNone:    "Нет свободных слотов на этот день. Выберите другой день.",
+    slotsNone:    "Нет свободных слотов на этот день. Выбери другой день.",
+
+    gdprText: "Я даю согласие на обработку моих персональных данных (включая данные о психическом здоровье) Алиной Шапутько исключительно в целях проведения психологической сессии. Данные не будут переданы третьим лицам. Согласие является добровольным и может быть отозвано в любое время по адресу: gorbachovaalina@gmail.com",
+    gdprErr:  "Пожалуйста, дайте согласие на обработку данных, чтобы продолжить.",
 
     monthNames: ["Январь","Февраль","Март","Апрель","Май","Июнь",
                  "Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"],
@@ -654,6 +687,12 @@ function applyTranslations() {
   setPlaceholder('inp-email',   tr('labelEmail'));
   setPlaceholder('inp-phone',   tr('labelPhone'));
   setPlaceholder('inp-problem', tr('labelProblem'));
+
+  // GDPR label (plain text, no HTML)
+  const gdprLabel = document.getElementById('gdpr-label');
+  if (gdprLabel) gdprLabel.textContent = tr('gdprText');
+  const gdprErr = document.getElementById('gdpr-err');
+  if (gdprErr) gdprErr.textContent = tr('gdprErr');
 }
 
 function setPlaceholder(id, text) {
@@ -665,7 +704,7 @@ function setPlaceholder(id, text) {
 // ║  GOOGLE CALENDAR — read availability (API key only)     ║
 // ╚══════════════════════════════════════════════════════════╝
 function initGapi() {
-  if (!CONFIG.googleApiKey || CONFIG.googleApiKey === 'REPLACE_ME') return;
+  if (!CONFIG.googleApiKey || CONFIG.googleApiKey === 'AIzaSyDsQxcHMTOj_eTKWpyJV5zJ4hSS5_PT1Vw') return;
   gapi.load('client', () => {
     gapi.client.init({
       apiKey: CONFIG.googleApiKey,
@@ -911,6 +950,16 @@ function submitForm() {
     slotWrap.classList.add('slots-err');
     setTimeout(() => slotWrap.classList.remove('slots-err'), 2000);
     ok = false;
+  }
+
+  // GDPR consent check
+  const gdprBox = document.getElementById('gdpr-box');
+  if (!document.getElementById('inp-gdpr').checked) {
+    gdprBox.classList.add('has-err');
+    setTimeout(() => gdprBox.classList.remove('has-err'), 3000);
+    ok = false;
+  } else {
+    gdprBox.classList.remove('has-err');
   }
 
   if (!ok) return;
