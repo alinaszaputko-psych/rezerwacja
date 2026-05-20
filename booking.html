@@ -479,6 +479,9 @@
           📅 <span data-t="btnAddCal"></span>
         </a>
         <button class="btn btn-secondary" onclick="location.href=location.pathname" data-t="btnBookAnother"></button>
+        <a class="btn-cal" id="btn-back-site" style="margin-top:8px;">
+          🏠 <span data-t="btnBackSite"></span>
+        </a>
       </div>
     </div>
   </div>
@@ -499,6 +502,9 @@ const CONFIG = {
     pl: "Zapraszam na sesję. Umów się w kilka minut.",
     ru: "Приглашаю тебя на сессию. Запишись за несколько минут.",
   },
+
+  // Your website URL — shown as "back to website" button on confirmation screen
+  websiteUrl: { pl: "https://psychologwroclaw.org/pol/", ru: "https://psychologwroclaw.org/" },
 
   // Session settings
   sessionDurationMinutes: 60,
@@ -558,6 +564,7 @@ const T = {
     btnBack:       "← Wróć do formularza",
     btnAddCal:     "Dodaj do Kalendarza Google",
     btnBookAnother: "Zarezerwuj kolejną sesję",
+    btnBackSite:    "Wróć na stronę główną",
 
     paymentNotice:  "Zostaniesz przekierowany/a na bezpieczną stronę płatności Stripe.",
     confirmTitle:   "Dziękuję za rezerwację!",
@@ -607,6 +614,7 @@ const T = {
     btnBack:        "← Вернуться к форме",
     btnAddCal:      "Добавить в Google Календарь",
     btnBookAnother: "Записаться ещё раз",
+    btnBackSite:    "Вернуться на сайт",
 
     paymentNotice:  "Сейчас тебя перенаправит на защищённую страницу оплаты Stripe.",
     confirmTitle:   "Спасибо за запись!",
@@ -704,7 +712,7 @@ function setPlaceholder(id, text) {
 // ║  GOOGLE CALENDAR — read availability (API key only)     ║
 // ╚══════════════════════════════════════════════════════════╝
 function initGapi() {
-  if (!CONFIG.googleApiKey || CONFIG.googleApiKey === 'AIzaSyDsQxcHMTOj_eTKWpyJV5zJ4hSS5_PT1Vw') return;
+  if (!CONFIG.googleApiKey || CONFIG.googleApiKey === 'REPLACE_ME') return;
   gapi.load('client', () => {
     gapi.client.init({
       apiKey: CONFIG.googleApiKey,
@@ -1057,6 +1065,8 @@ function showConfirmScreen() {
     ).join('');
 
   document.getElementById('btn-add-cal').href = buildGCalLink(b);
+  const backBtn = document.getElementById('btn-back-site');
+  if (backBtn) backBtn.href = CONFIG.websiteUrl[b.lang] || CONFIG.websiteUrl.pl;
 
   sendEmail(b);
   localStorage.removeItem('bk_pending');
@@ -1138,9 +1148,8 @@ function fmtDateFriendly(d) {
   return `${tr('dayNamesFull')[d.getDay()]}, ${d.getDate()} ${tr('monthNames')[d.getMonth()]} ${d.getFullYear()}`;
 }
 function typeLabel(key) {
-  if (!key) return '';
-  const map = { first: 'typeFirst', individual: 'typeIndividual', couples: 'typeCouples' };
-  return map[key] ? tr(map[key]) : key;
+  // Only individual sessions offered — hide from all summaries
+  return '';
 }
 
 // ╔══════════════════════════════════════════════════════════╗
