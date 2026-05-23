@@ -439,6 +439,11 @@
       </div>
     </div>
 
+    <div id="policy-link-wrap" style="margin-bottom:10px; font-size:13px;">
+      <a id="policy-link" href="" target="_blank" rel="noopener"
+         style="color:var(--accent); text-decoration:underline;" id="policy-link"></a>
+    </div>
+
     <div class="gdpr-box" id="gdpr-box">
       <input type="checkbox" id="inp-gdpr">
       <label for="inp-gdpr" id="gdpr-label"></label>
@@ -517,12 +522,22 @@ const CONFIG = {
 
   // Session settings
   sessionDurationMinutes: 60,
-  sessionPrice:           1,
+  sessionPrice:           160,
   currency:               "PLN",
 
+  // Minimum hours in advance a client must book
+  minBookingHours: 24,
+
   // Working hours (24-h format) and days (0=Sun, 1=Mon … 6=Sat)
-  workingDays:  [1, 2, 3, 4, 5],
+  workingDays:  [1, 2, 3, 4, 5], // Mon–Fri only, weekends disabled
   workingHours: { start: "09:00", end: "17:00" },
+
+  // Cancellation & booking policy page links (shown on the booking form)
+  // Set to "" to hide the link
+  policyUrl: {
+    pl: "https://psychologwroclaw.org/zasady/",  // ← replace with your actual URL
+    ru: "https://psychologwroclaw.org/pravila/",   // ← replace with your actual URL
+  },
 
   // Stripe ─ create a Payment Link in your Stripe dashboard,
   //   set its Success URL to: https://yoursite.com/booking.html?status=paid
@@ -592,6 +607,7 @@ const T = {
 
     gdprText: "Wyrażam zgodę na przetwarzanie moich danych osobowych (w tym danych dotyczących zdrowia psychicznego) przez Alinę Szaputko wyłącznie w celu realizacji sesji psychologicznej. Dane nie będą udostępniane osobom trzecim. Zgoda jest dobrowolna i można ją wycofać w każdej chwili, pisząc na adres: gorbachovaalina@gmail.com",
     gdprErr:  "Prosimy o wyrażenie zgody na przetwarzanie danych, aby kontynuować.",
+    policyLinkText: "Zapoznaj się z zasadami rezerwacji i anulowania wizyt →",
     meetLabel: "Twój unikalny link do sesji online (Google Meet):",
     meetLinkText: "Dołącz do sesji",
 
@@ -649,6 +665,7 @@ const T = {
 
     gdprText: "Я даю согласие на обработку моих персональных данных (включая данные о психическом здоровье) Алиной Шапутько исключительно в целях проведения психологической сессии. Данные не будут переданы третьим лицам. Согласие является добровольным и может быть отозвано в любое время по адресу: gorbachovaalina@gmail.com",
     gdprErr:  "Пожалуйста, дайте согласие на обработку данных, чтобы продолжить.",
+    policyLinkText: "Ознакомьтесь с правилами записи и отмены сессий →",
     meetLabel: "Твоя уникальная ссылка для онлайн-сессии:",
     meetLinkText: "Присоединиться к сессии",
 
@@ -720,6 +737,20 @@ function applyTranslations() {
   if (gdprLabel) gdprLabel.textContent = tr('gdprText');
   const gdprErr = document.getElementById('gdpr-err');
   if (gdprErr) gdprErr.textContent = tr('gdprErr');
+
+  // Policy link
+  const policyUrl  = CONFIG.policyUrl[lang] || '';
+  const policyWrap = document.getElementById('policy-link-wrap');
+  const policyLink = document.getElementById('policy-link');
+  if (policyWrap && policyLink) {
+    if (policyUrl) {
+      policyWrap.style.display = 'block';
+      policyLink.href          = policyUrl;
+      policyLink.textContent   = tr('policyLinkText');
+    } else {
+      policyWrap.style.display = 'none';
+    }
+  }
 }
 
 function setPlaceholder(id, text) {
@@ -814,6 +845,7 @@ function renderCalendar() {
     grid.appendChild(h);
   });
 
+  const now   = new Date();
   const today = new Date();
   today.setHours(0,0,0,0);
 
@@ -844,10 +876,11 @@ function renderCalendar() {
     const isToday   = date.getTime() === today.getTime();
     const isPast    = date < today;
     const isWorking = CONFIG.workingDays.includes(date.getDay());
+    const isTooSoon = (date.getTime() - now.getTime()) < CONFIG.minBookingHours * 3600000;
 
     if (isToday) el.classList.add('today');
 
-    if (isPast || !isWorking) {
+    if (isPast || !isWorking || isTooSoon) {
       el.classList.add('dis');
     } else {
       if (selectedDate && fmtDate(selectedDate) === dateStr) el.classList.add('sel');
@@ -917,11 +950,13 @@ async function onDateClick(date) {
 }
 
 function isSlotTaken(dateStr, slotTime, busyRanges) {
-  if (!busyRanges || !busyRanges.length) return false;
-  const [h, m] = slotTime.split(':').map(Number);
   const slotStart = new Date(dateStr + 'T' + slotTime + ':00').getTime();
   const slotEnd   = slotStart + CONFIG.sessionDurationMinutes * 60000;
-  // Slot is blocked if it overlaps with ANY calendar event (not just exact start match)
+
+  // Block slots less than minBookingHours away
+  if (slotStart - Date.now() < CONFIG.minBookingHours * 3600000) return true;
+
+  if (!busyRanges || !busyRanges.length) return false;
   return busyRanges.some(r => slotStart < r.end && slotEnd > r.start);
 }
 
