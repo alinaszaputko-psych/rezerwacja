@@ -475,6 +475,13 @@
         <div class="confirm-title" data-t="confirmTitle"></div>
         <div class="confirm-sub" id="confirm-sub"></div>
         <div id="confirm-summary" style="text-align:left"></div>
+        <div id="meet-box" style="display:none; margin:16px 0; background:var(--accent-light); border-radius:10px; padding:14px 16px; text-align:left;">
+          <div style="font-size:13px; color:var(--muted); margin-bottom:6px;" id="meet-label"></div>
+          <a id="meet-link-btn" target="_blank" rel="noopener"
+             style="display:inline-block; background:var(--accent); color:#fff; padding:10px 18px; border-radius:8px; font-size:14px; font-weight:600; text-decoration:none; word-break:break-all;">
+            🎥 <span id="meet-link-text"></span>
+          </a>
+        </div>
         <a id="btn-add-cal" class="btn-cal" target="_blank" rel="noopener">
           📅 <span data-t="btnAddCal"></span>
         </a>
@@ -519,17 +526,14 @@ const CONFIG = {
   //   set its Success URL to: https://yoursite.com/booking.html?status=paid
   stripePaymentLinkUrl: "https://buy.stripe.com/00wdRbeGN8Nj4Dwb3hc7u00",
 
-  // Google Calendar ─ create an API key in Google Cloud Console,
-  //   restrict it to the Calendar API. Your calendar must be PUBLIC
-  //   (Calendar settings → Share with specific people → Make available to public).
+  // Google Calendar — API key for reading availability (public calendar)
+  // Created in Google Cloud Console → APIs & Services → Credentials
   googleApiKey:      "AIzaSyDsQxcHMTOj_eTKWpyJV5zJ4hSS5_PT1Vw",
   googleCalendarId:  "gorbachovaalina@gmail.com",
 
-  // EmailJS ─ sign up at emailjs.com (free), create a service + template
-  emailjsPublicKey:  "REPLACE_ME",
-  emailjsServiceId:  "REPLACE_ME",
-  emailjsTemplateId: "REPLACE_ME",
-  therapistEmail:    "gorbachovaalina@gmail.com",  // receives booking notifications
+  // Vercel backend URL — paste your Vercel deployment URL here after deploying
+  // e.g. "https://booking-backend-yourname.vercel.app/api/create-event"
+  vercelApiUrl: "https://booking-backend-kappa-drab.vercel.app/api/create-event",
 
   defaultLanguage: "pl",
 };
@@ -579,8 +583,15 @@ const T = {
     slotsLoading: "Sprawdzam dostępność…",
     slotsNone:    "Brak wolnych terminów tego dnia. Wybierz inny dzień.",
 
+    authRequired:  "Aby dokończyć rezerwację, zaloguj się do Google (wymagane do utworzenia wydarzenia w kalendarzu).",
+    authBtn:       "Zaloguj się przez Google →",
+    creatingEvent: "Tworzę wydarzenie w kalendarzu…",
+    confirmSubMsg: "Wydarzenie zostało dodane do Twojego kalendarza Google wraz z linkiem do sesji.",
+
     gdprText: "Wyrażam zgodę na przetwarzanie moich danych osobowych (w tym danych dotyczących zdrowia psychicznego) przez Alinę Szaputko wyłącznie w celu realizacji sesji psychologicznej. Dane nie będą udostępniane osobom trzecim. Zgoda jest dobrowolna i można ją wycofać w każdej chwili, pisząc na adres: gorbachovaalina@gmail.com",
     gdprErr:  "Prosimy o wyrażenie zgody na przetwarzanie danych, aby kontynuować.",
+    meetLabel: "Twój unikalny link do sesji online (Google Meet):",
+    meetLinkText: "Dołącz do sesji",
 
     monthNames: ["Styczeń","Luty","Marzec","Kwiecień","Maj","Czerwiec",
                  "Lipiec","Sierpień","Wrzesień","Październik","Listopad","Grudzień"],
@@ -629,8 +640,15 @@ const T = {
     slotsLoading: "Проверяю доступность…",
     slotsNone:    "Нет свободных слотов на этот день. Выбери другой день.",
 
+    authRequired:  "Чтобы завершить запись, войдите через Google (необходимо для создания события в календаре).",
+    authBtn:       "Войти через Google →",
+    creatingEvent: "Создаю событие в календаре…",
+    confirmSubMsg: "Событие добавлено в твой Google Календарь вместе со ссылкой на сессию.",
+
     gdprText: "Я даю согласие на обработку моих персональных данных (включая данные о психическом здоровье) Алиной Шапутько исключительно в целях проведения психологической сессии. Данные не будут переданы третьим лицам. Согласие является добровольным и может быть отозвано в любое время по адресу: gorbachovaalina@gmail.com",
     gdprErr:  "Пожалуйста, дайте согласие на обработку данных, чтобы продолжить.",
+    meetLabel: "Твоя уникальная ссылка для онлайн-сессии:",
+    meetLinkText: "Присоединиться к сессии",
 
     monthNames: ["Январь","Февраль","Март","Апрель","Май","Июнь",
                  "Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"],
@@ -644,11 +662,10 @@ const T = {
 // ╚══════════════════════════════════════════════════════════╝
 let lang = CONFIG.defaultLanguage;
 let calYear, calMonth;
-let selectedDate = null;   // Date object
-let selectedTime = null;   // "HH:MM"
-let busyCache   = {};      // { "YYYY-MM-DD": ["HH:MM", ...] }
-let gapiReady   = false;
-let pendingBooking = null; // filled on form submit, used after Stripe return
+let selectedDate = null;
+let selectedTime = null;
+let busyCache    = {};
+let pendingBooking = null;
 
 // ╔══════════════════════════════════════════════════════════╗
 // ║  LANGUAGE                                               ║
@@ -709,15 +726,18 @@ function setPlaceholder(id, text) {
 }
 
 // ╔══════════════════════════════════════════════════════════╗
-// ║  GOOGLE CALENDAR — read availability (API key only)     ║
+// ║  GOOGLE CALENDAR — read availability (API key, public)  ║
 // ╚══════════════════════════════════════════════════════════╝
+let gapiReady = false;
+
 function initGapi() {
   if (!CONFIG.googleApiKey || CONFIG.googleApiKey === 'REPLACE_ME') return;
-  gapi.load('client', () => {
-    gapi.client.init({
+  gapi.load('client', async () => {
+    await gapi.client.init({
       apiKey: CONFIG.googleApiKey,
       discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
-    }).then(() => { gapiReady = true; });
+    });
+    gapiReady = true;
   });
 }
 
@@ -736,11 +756,19 @@ async function fetchBusySlots(dateStr) {
       singleEvents: true,
       orderBy:      'startTime',
     });
-    const taken = (resp.result.items || [])
-      .filter(ev => ev.start && ev.start.dateTime)
-      .map(ev => fmtTime(new Date(ev.start.dateTime)));
-    busyCache[dateStr] = taken;
-    return taken;
+    // Store full {start, end} ranges so we can detect overlap, not just exact matches
+    const ranges = (resp.result.items || [])
+      .filter(ev => ev.start && (ev.start.dateTime || ev.start.date))
+      .map(ev => ({
+        start: ev.start.dateTime
+          ? new Date(ev.start.dateTime).getTime()
+          : new Date(dateStr + 'T00:00:00').getTime(),
+        end: ev.end.dateTime
+          ? new Date(ev.end.dateTime).getTime()
+          : new Date(dateStr + 'T23:59:59').getTime(),
+      }));
+    busyCache[dateStr] = ranges;
+    return ranges;
   } catch (e) {
     console.warn('Calendar API error:', e);
     busyCache[dateStr] = [];
@@ -856,10 +884,19 @@ async function onDateClick(date) {
   renderSlots(date, taken);
 }
 
+function isSlotTaken(dateStr, slotTime, busyRanges) {
+  if (!busyRanges || !busyRanges.length) return false;
+  const [h, m] = slotTime.split(':').map(Number);
+  const slotStart = new Date(dateStr + 'T' + slotTime + ':00').getTime();
+  const slotEnd   = slotStart + CONFIG.sessionDurationMinutes * 60000;
+  // Slot is blocked if it overlaps with ANY calendar event (not just exact start match)
+  return busyRanges.some(r => slotStart < r.end && slotEnd > r.start);
+}
+
 function renderSlots(date, takenOverride) {
   const container = document.getElementById('slots-container');
   const dateStr   = fmtDate(date);
-  const taken     = takenOverride !== undefined ? takenOverride : (busyCache[dateStr] || []);
+  const busyRanges = takenOverride !== undefined ? takenOverride : (busyCache[dateStr] || []);
   const allSlots  = generateSlots();
 
   if (!allSlots.length) {
@@ -867,8 +904,8 @@ function renderSlots(date, takenOverride) {
     return;
   }
 
-  const available = allSlots.filter(s => !taken.includes(s));
-  if (!available.length) {
+  const freeSlots = allSlots.filter(s => !isSlotTaken(dateStr, s, busyRanges));
+  if (!freeSlots.length) {
     container.innerHTML = `<div class="slots-msg">${tr('slotsNone')}</div>`;
     return;
   }
@@ -880,7 +917,7 @@ function renderSlots(date, takenOverride) {
     const btn = document.createElement('button');
     btn.className = 'slot';
     btn.textContent = time;
-    if (taken.includes(time)) {
+    if (isSlotTaken(dateStr, time, busyRanges)) {
       btn.classList.add('taken');
       btn.disabled = true;
     } else {
@@ -1036,27 +1073,31 @@ function goToStripe() {
 function showConfirmScreen() {
   const raw = localStorage.getItem('bk_pending');
   if (!raw) { showScreen('form'); return; }
-
   const b = JSON.parse(raw);
-
-  // Expire bookings older than 2 hours (stale data guard)
   if (Date.now() - b.ts > 7200000) {
     localStorage.removeItem('bk_pending');
     showScreen('form');
     return;
   }
-
-  // Restore language from booking
   if (b.lang && T[b.lang]) { lang = b.lang; setLang(lang); }
+  pendingBooking = b;
+  localStorage.removeItem('bk_pending');
 
+  // Show confirm screen immediately with available info
+  renderConfirmUI(b);
+  showScreen('confirm');
+
+  // Then create the calendar event (triggers OAuth popup if needed)
+  createCalendarEvent(b);
+}
+
+function renderConfirmUI(b) {
   document.getElementById('confirm-sub').textContent =
     `${b.name} — ${tr('confirmSubMsg')}`;
 
-  const typeLbl = typeLabel(b.sessionType);
   const rows = [
     [tr('summaryDate'),     b.dateFriendly || b.date],
     [tr('summaryTime'),     b.time],
-    ...(typeLbl ? [[tr('summaryType'), typeLbl]] : []),
     [tr('summaryDuration'), `${CONFIG.sessionDurationMinutes} ${tr('summaryMinutes')}`],
   ];
   document.getElementById('confirm-summary').innerHTML =
@@ -1064,53 +1105,106 @@ function showConfirmScreen() {
       `<div class="summary-row"><span class="lbl">${l}</span><span class="val">${v}</span></div>`
     ).join('');
 
-  document.getElementById('btn-add-cal').href = buildGCalLink(b);
   const backBtn = document.getElementById('btn-back-site');
   if (backBtn) backBtn.href = CONFIG.websiteUrl[b.lang] || CONFIG.websiteUrl.pl;
 
-  sendEmail(b);
-  localStorage.removeItem('bk_pending');
-  showScreen('confirm');
+  // Hide meet box until we get the link from Calendar API
+  const meetBox = document.getElementById('meet-box');
+  if (meetBox) meetBox.style.display = 'none';
+
+  // Hide add-to-cal button until event is created
+  const calBtn = document.getElementById('btn-add-cal');
+  if (calBtn) calBtn.style.display = 'none';
 }
 
-function buildGCalLink(b) {
+async function createCalendarEvent(b) {
+  // If Vercel URL not configured yet, fall back to deep link
+  if (!CONFIG.vercelApiUrl || CONFIG.vercelApiUrl === 'REPLACE_WITH_VERCEL_URL') {
+    showAddToCalFallback(b);
+    return;
+  }
+
+  // Show "creating…" spinner
+  const meetBox = document.getElementById('meet-box');
+  if (meetBox) {
+    meetBox.style.display = 'block';
+    meetBox.innerHTML = `<div style="color:var(--muted);font-size:13px;padding:8px 0;">⏳ ${tr('creatingEvent')}</div>`;
+  }
+
+  try {
+    const resp = await fetch(CONFIG.vercelApiUrl, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name:     b.name,
+        email:    b.email,
+        phone:    b.phone || '',
+        problem:  b.problem,
+        date:     b.date,
+        time:     b.time,
+        duration: CONFIG.sessionDurationMinutes,
+        lang:     b.lang,
+      }),
+    });
+
+    const data = await resp.json();
+
+    if (data.success && data.meetLink) {
+      showMeetLink(data.meetLink, data.eventLink);
+    } else {
+      showAddToCalFallback(b);
+    }
+  } catch (err) {
+    console.warn('Vercel API error:', err);
+    showAddToCalFallback(b);
+  }
+}
+
+function showMeetLink(meetLink, eventLink) {
+  const meetBox = document.getElementById('meet-box');
+  if (!meetBox) return;
+
+  if (meetLink) {
+    meetBox.style.display = 'block';
+    meetBox.innerHTML = `
+      <div style="font-size:13px;color:var(--muted);margin-bottom:8px;">${tr('meetLabel')}</div>
+      <a href="${meetLink}" target="_blank" rel="noopener"
+         style="display:inline-block;background:var(--accent);color:#fff;padding:10px 18px;
+                border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;">
+        🎥 ${tr('meetLinkText')}
+      </a>`;
+  } else {
+    meetBox.style.display = 'none';
+  }
+
+  // Show the calendar event link if we have it
+  const calBtn = document.getElementById('btn-add-cal');
+  if (calBtn && eventLink) {
+    calBtn.href = eventLink;
+    calBtn.style.display = 'flex';
+  } else if (calBtn) {
+    calBtn.style.display = 'none';
+  }
+}
+
+function showAddToCalFallback(b) {
+  // No OAuth — show the deep-link "Add to Google Calendar" button instead
   const [y, mo, d] = b.date.split('-').map(Number);
   const [h, m]     = b.time.split(':').map(Number);
   const start = new Date(y, mo-1, d, h, m);
   const end   = new Date(start.getTime() + CONFIG.sessionDurationMinutes * 60000);
   const fmtGCal = dt => dt.toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');
-  return 'https://calendar.google.com/calendar/render?action=TEMPLATE'
+  const url = 'https://calendar.google.com/calendar/render?action=TEMPLATE'
     + `&text=${encodeURIComponent('Sesja – ' + CONFIG.therapistName)}`
     + `&dates=${fmtGCal(start)}/${fmtGCal(end)}`
     + `&details=${encodeURIComponent(b.problem)}`
     + `&add=${encodeURIComponent(b.email)}`;
-}
 
-// ╔══════════════════════════════════════════════════════════╗
-// ║  EMAILJS                                                ║
-// ╚══════════════════════════════════════════════════════════╝
-function loadEmailJS() {
-  if (!CONFIG.emailjsPublicKey || CONFIG.emailjsPublicKey === 'REPLACE_ME') return;
-  const s = document.createElement('script');
-  s.src = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js';
-  s.onload = () => emailjs.init({ publicKey: CONFIG.emailjsPublicKey });
-  document.head.appendChild(s);
-}
+  const calBtn = document.getElementById('btn-add-cal');
+  if (calBtn) { calBtn.href = url; calBtn.style.display = 'flex'; }
 
-function sendEmail(b) {
-  if (typeof emailjs === 'undefined') return;
-  emailjs.send(CONFIG.emailjsServiceId, CONFIG.emailjsTemplateId, {
-    to_name:     b.name,
-    to_email:    b.email,
-    cc_email:    CONFIG.therapistEmail,
-    date:        b.dateFriendly || b.date,
-    time:        b.time,
-    session_type: typeLabel(b.sessionType) || '—',
-    problem:     b.problem,
-    therapist:   CONFIG.therapistName,
-    duration:    CONFIG.sessionDurationMinutes,
-    phone:       b.phone || '—',
-  }).catch(err => console.warn('EmailJS error:', err));
+  const meetBox = document.getElementById('meet-box');
+  if (meetBox) meetBox.style.display = 'none';
 }
 
 // ╔══════════════════════════════════════════════════════════╗
@@ -1159,18 +1253,15 @@ window.addEventListener('load', () => {
   lang = detectLang();
   setLang(lang);
   initCalendar();
-  loadEmailJS();
   if (!handleUrlParams()) showScreen('form');
 });
 
-// Google API onload callback
+// Google API callback
 window.gapiOnload = initGapi;
 </script>
 
-<!-- Google API loaded async; onload calls gapiOnload() -->
-<script async defer
-  src="https://apis.google.com/js/api.js?onload=gapiOnload">
-</script>
+<!-- Google API client (read calendar availability) -->
+<script async defer src="https://apis.google.com/js/api.js?onload=gapiOnload"></script>
 
 </body>
 </html>
