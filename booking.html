@@ -367,6 +367,26 @@
     .screen { display: none; }
     .screen.active { display: block; }
 
+    /* ── Instagram notice ── */
+    .instagram-notice {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      font-size: 13.5px;
+      color: var(--muted);
+      padding: 12px 16px;
+      background: var(--accent-light);
+      border-left: 3px solid var(--accent);
+    }
+    .instagram-notice a {
+      color: var(--accent);
+      font-weight: 600;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .instagram-notice a:hover { text-decoration: underline; }
+
     /* ── Responsive ── */
     @media (max-width: 380px) {
       .slots-grid { grid-template-columns: repeat(2, 1fr); }
@@ -390,6 +410,13 @@
       <h1 id="therapist-name"></h1>
       <p class="therapist-welcome" id="therapist-welcome"></p>
     </div>
+  </div>
+
+  <!-- Instagram notice -->
+  <div class="card instagram-notice" id="instagram-notice">
+    <span id="instagram-notice-text"></span>
+    <a href="https://www.instagram.com/alinaszaputko" target="_blank" rel="noopener"
+       id="instagram-link">@alinaszaputko</a>
   </div>
 
   <!-- ── SCREEN 1: Booking form ── -->
@@ -548,6 +575,10 @@ const CONFIG = {
   googleApiKey:      "AIzaSyDsQxcHMTOj_eTKWpyJV5zJ4hSS5_PT1Vw",
   googleCalendarId:  "gorbachovaalina@gmail.com",
 
+  // Shared secret — must match BOOKING_SECRET in Vercel environment variables
+  // Prevents unauthorised use of your Vercel endpoint
+  bookingSecret: "sesja-code-Akfh&395^904HTdfr",
+
   // Vercel backend URL — paste your Vercel deployment URL here after deploying
   // e.g. "https://booking-backend-yourname.vercel.app/api/create-event"
   vercelApiUrl: "https://booking-backend-kappa-drab.vercel.app/api/create-event",
@@ -608,6 +639,7 @@ const T = {
     gdprText: "Wyrażam zgodę na przetwarzanie moich danych osobowych (w tym danych dotyczących zdrowia psychicznego) przez Alinę Szaputko wyłącznie w celu realizacji sesji psychologicznej. Dane nie będą udostępniane osobom trzecim. Zgoda jest dobrowolna i można ją wycofać w każdej chwili, pisząc na adres: gorbachovaalina@gmail.com",
     gdprErr:  "Prosimy o wyrażenie zgody na przetwarzanie danych, aby kontynuować.",
     policyLinkText: "Zapoznaj się z zasadami rezerwacji i anulowania wizyt →",
+    instagramNotice: "Jeśli w kalendarzu nie ma odpowiedniego terminu lub masz inne pytania, napisz na Instagramie: ",
     meetLabel: "Twój unikalny link do sesji online (Google Meet):",
     meetLinkText: "Dołącz do sesji",
 
@@ -666,6 +698,7 @@ const T = {
     gdprText: "Я даю согласие на обработку моих персональных данных (включая данные о психическом здоровье) Алиной Шапутько исключительно в целях проведения психологической сессии. Данные не будут переданы третьим лицам. Согласие является добровольным и может быть отозвано в любое время по адресу: gorbachovaalina@gmail.com",
     gdprErr:  "Пожалуйста, дайте согласие на обработку данных, чтобы продолжить.",
     policyLinkText: "Ознакомьтесь с правилами записи и отмены сессий →",
+    instagramNotice: "Если в расписании нет удобного окошка или есть другие вопросы, прошу писать в Инстаграм: ",
     meetLabel: "Твоя уникальная ссылка для онлайн-сессии:",
     meetLinkText: "Присоединиться к сессии",
 
@@ -751,6 +784,10 @@ function applyTranslations() {
       policyWrap.style.display = 'none';
     }
   }
+
+  // Instagram notice
+  const noticeText = document.getElementById('instagram-notice-text');
+  if (noticeText) noticeText.textContent = tr('instagramNotice');
 }
 
 function setPlaceholder(id, text) {
@@ -1201,7 +1238,10 @@ async function createCalendarEvent(b) {
   try {
     const resp = await fetch(CONFIG.vercelApiUrl, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type':      'application/json',
+        'X-Booking-Secret':  CONFIG.bookingSecret,
+      },
       body: JSON.stringify({
         name:     b.name,
         email:    b.email,
