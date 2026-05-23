@@ -195,6 +195,8 @@
     .cal-day.sel { background: var(--accent); color: #fff; border-color: var(--accent); }
     .cal-day.today { border-color: var(--accent); font-weight: 700; }
     .cal-day.dis { color: var(--muted); cursor: not-allowed; opacity: .38; }
+    .cal-day.fully-booked { color: var(--muted); cursor: not-allowed; opacity: .38; }
+    .cal-day.fully-booked::after { content: "•"; display: block; font-size: 7px; line-height:1; color: var(--error); margin-top: -2px; }
     .cal-day.other { color: var(--border); cursor: default; }
     .cal-err { outline: 2px solid var(--error); border-radius: 8px; }
 
@@ -862,6 +864,36 @@ function renderCalendar() {
     el.className = 'cal-day other';
     el.textContent = i;
     grid.appendChild(el);
+  }
+
+  // After rendering, asynchronously grey out fully-booked days
+  disableFullyBookedDays(calYear, calMonth, daysInMon, today, grid);
+}
+
+async function disableFullyBookedDays(year, month, daysInMon, today, grid) {
+  if (!gapiReady) return;
+  const allSlots = generateSlots();
+  if (!allSlots.length) return;
+
+  // Get all clickable day elements in this grid
+  const dayCells = Array.from(grid.querySelectorAll('.cal-day:not(.other):not(.dis)'));
+
+  for (const el of dayCells) {
+    const d       = parseInt(el.textContent);
+    const date    = new Date(year, month, d);
+    const dateStr = fmtDate(date);
+
+    const busy = await fetchBusySlots(dateStr);
+    const allTaken = allSlots.every(s => isSlotTaken(dateStr, s, busy));
+
+    if (allTaken) {
+      el.classList.add('dis', 'fully-booked');
+      el.removeEventListener('click', el._clickHandler);
+      // Replace with a non-clickable clone
+      const clone = el.cloneNode(true);
+      clone.classList.add('dis', 'fully-booked');
+      el.replaceWith(clone);
+    }
   }
 }
 
