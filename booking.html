@@ -808,16 +808,58 @@ function initGapi() {
       discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
     });
     gapiReady = true;
+    // Pre-fetch this month's busy slots and re-render calendar once API is ready
+    await prefetchMonth(calYear, calMonth);
+    renderCalendar();
   });
+}
+
+// Fetch ALL events for an entire month in one API call
+async function prefetchMonth(year, month) {
+  if (!gapiReady) return;
+  const monthStart = new Date(year, month, 1);
+  const monthEnd   = new Date(year, month + 1, 0, 23, 59, 59);
+  try {
+    const resp = await gapi.client.calendar.events.list({
+      calendarId:   CONFIG.googleCalendarId,
+      timeMin:      monthStart.toISOString(),
+      timeMax:      monthEnd.toISOString(),
+      singleEvents: true,
+      orderBy:      'startTime',
+      maxResults:   250,
+    });
+    // Group events by date into busyCache
+    for (const ev of (resp.result.items || [])) {
+      if (!ev.start) continue;
+      const dateStr = (ev.start.dateTime || ev.start.date).slice(0, 10);
+      if (!busyCache[dateStr]) busyCache[dateStr] = [];
+      busyCache[dateStr].push({
+        start: ev.start.dateTime
+          ? new Date(ev.start.dateTime).getTime()
+          : new Date(dateStr + 'T00:00:00').getTime(),
+        end: ev.end.dateTime
+          ? new Date(ev.end.dateTime).getTime()
+          : new Date(dateStr + 'T23:59:59').getTime(),
+      });
+    }
+    // Mark days with no events as empty arrays so we don't re-fetch them
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const pad = n => String(n).padStart(2, '0');
+    for (let d = 1; d <= daysInMonth; d++) {
+      const key = `${year}-${pad(month + 1)}-${pad(d)}`;
+      if (busyCache[key] === undefined) busyCache[key] = [];
+    }
+  } catch (e) {
+    console.warn('Calendar prefetch error:', e);
+  }
 }
 
 async function fetchBusySlots(dateStr) {
   if (busyCache[dateStr] !== undefined) return busyCache[dateStr];
   if (!gapiReady) { busyCache[dateStr] = []; return []; }
-
+  // Single-day fallback (e.g. when navigating to next month before prefetch)
   const dayStart = new Date(dateStr + 'T00:00:00');
   const dayEnd   = new Date(dateStr + 'T23:59:59');
-
   try {
     const resp = await gapi.client.calendar.events.list({
       calendarId:   CONFIG.googleCalendarId,
@@ -826,7 +868,6 @@ async function fetchBusySlots(dateStr) {
       singleEvents: true,
       orderBy:      'startTime',
     });
-    // Store full {start, end} ranges so we can detect overlap, not just exact matches
     const ranges = (resp.result.items || [])
       .filter(ev => ev.start && (ev.start.dateTime || ev.start.date))
       .map(ev => ({
@@ -860,7 +901,8 @@ function calMove(dir) {
   calMonth += dir;
   if (calMonth > 11) { calMonth = 0;  calYear++; }
   if (calMonth < 0)  { calMonth = 11; calYear--; }
-  renderCalendar();
+  // Prefetch busy slots for new month, then render
+  prefetchMonth(calYear, calMonth).then(() => renderCalendar());
 }
 
 function renderCalendar() {
@@ -940,26 +982,20 @@ function renderCalendar() {
   disableFullyBookedDays(calYear, calMonth, daysInMon, today, grid);
 }
 
-async function disableFullyBookedDays(year, month, daysInMon, today, grid) {
+function disableFullyBookedDays(year, month, daysInMon, today, grid) {
+  // Cache is already populated by prefetchMonth — this runs synchronously
   if (!gapiReady) return;
   const allSlots = generateSlots();
   if (!allSlots.length) return;
 
-  // Get all clickable day elements in this grid
   const dayCells = Array.from(grid.querySelectorAll('.cal-day:not(.other):not(.dis)'));
-
   for (const el of dayCells) {
     const d       = parseInt(el.textContent);
-    const date    = new Date(year, month, d);
-    const dateStr = fmtDate(date);
-
-    const busy = await fetchBusySlots(dateStr);
+    const pad     = n => String(n).padStart(2, '0');
+    const dateStr = `${year}-${pad(month + 1)}-${pad(d)}`;
+    const busy    = busyCache[dateStr] || [];
     const allTaken = allSlots.every(s => isSlotTaken(dateStr, s, busy));
-
     if (allTaken) {
-      el.classList.add('dis', 'fully-booked');
-      el.removeEventListener('click', el._clickHandler);
-      // Replace with a non-clickable clone
       const clone = el.cloneNode(true);
       clone.classList.add('dis', 'fully-booked');
       el.replaceWith(clone);
