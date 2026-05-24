@@ -369,15 +369,25 @@
 
     /* ── Instagram notice ── */
     .instagram-notice {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 6px;
-      font-size: 13.5px;
-      color: var(--muted);
-      padding: 12px 16px;
+      padding: 14px 16px;
       background: var(--accent-light);
       border-left: 3px solid var(--accent);
+      margin-bottom: 12px;
+    }
+    .instagram-notice-inner {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .instagram-notice-icon {
+      font-size: 20px;
+      line-height: 1.4;
+      flex-shrink: 0;
+    }
+    .instagram-notice div {
+      font-size: 13.5px;
+      color: var(--muted);
+      line-height: 1.6;
     }
     .instagram-notice a {
       color: var(--accent);
@@ -414,9 +424,15 @@
 
   <!-- Instagram notice -->
   <div class="card instagram-notice" id="instagram-notice">
-    <span id="instagram-notice-text"></span>
-    <a href="https://www.instagram.com/alinaszaputko" target="_blank" rel="noopener"
-       id="instagram-link">@alinaszaputko</a>
+    <div class="instagram-notice-inner">
+      <span class="instagram-notice-icon">💬</span>
+      <div>
+        <span id="instagram-notice-text"></span>
+        <a href="https://www.instagram.com/alinaszaputko" target="_blank" rel="noopener"
+           id="instagram-link">@alinaszaputko</a>
+        <span id="instagram-notice-suffix"></span>
+      </div>
+    </div>
   </div>
 
   <!-- ── SCREEN 1: Booking form ── -->
@@ -554,6 +570,7 @@ const CONFIG = {
 
   // Minimum hours in advance a client must book
   minBookingHours: 24,
+  maxBookingDays:  14, // clients can only book within the next 2 weeks
 
   // Working hours (24-h format) and days (0=Sun, 1=Mon … 6=Sat)
   workingDays:  [1, 2, 3, 4, 5], // Mon–Fri only, weekends disabled
@@ -639,7 +656,8 @@ const T = {
     gdprText: "Wyrażam zgodę na przetwarzanie moich danych osobowych (w tym danych dotyczących zdrowia psychicznego) przez Alinę Szaputko wyłącznie w celu realizacji sesji psychologicznej. Dane nie będą udostępniane osobom trzecim. Zgoda jest dobrowolna i można ją wycofać w każdej chwili, pisząc na adres: gorbachovaalina@gmail.com",
     gdprErr:  "Prosimy o wyrażenie zgody na przetwarzanie danych, aby kontynuować.",
     policyLinkText: "Zapoznaj się z zasadami rezerwacji i anulowania wizyt →",
-    instagramNotice: "Jeśli w kalendarzu nie ma odpowiedniego terminu lub masz inne pytania, napisz na Instagramie: ",
+    instagramNotice:       "Nie widzisz odpowiedniego terminu lub masz pytania? Napisz do mnie na Instagramie: ",
+    instagramNoticeSuffix: " — chętnie pomogę znaleźć odpowiedni czas.",
     meetLabel: "Twój unikalny link do sesji online (Google Meet):",
     meetLinkText: "Dołącz do sesji",
 
@@ -698,7 +716,8 @@ const T = {
     gdprText: "Я даю согласие на обработку моих персональных данных (включая данные о психическом здоровье) Алиной Шапутько исключительно в целях проведения психологической сессии. Данные не будут переданы третьим лицам. Согласие является добровольным и может быть отозвано в любое время по адресу: gorbachovaalina@gmail.com",
     gdprErr:  "Пожалуйста, дайте согласие на обработку данных, чтобы продолжить.",
     policyLinkText: "Ознакомьтесь с правилами записи и отмены сессий →",
-    instagramNotice: "Если в расписании нет удобного окошка или есть другие вопросы, прошу писать в Инстаграм: ",
+    instagramNotice:       "Не видишь подходящего окошка или есть вопросы? Напиши мне в Инстаграм: ",
+    instagramNoticeSuffix: " — с удовольствием помогу подобрать удобное время.",
     meetLabel: "Твоя уникальная ссылка для онлайн-сессии:",
     meetLinkText: "Присоединиться к сессии",
 
@@ -786,8 +805,10 @@ function applyTranslations() {
   }
 
   // Instagram notice
-  const noticeText = document.getElementById('instagram-notice-text');
-  if (noticeText) noticeText.textContent = tr('instagramNotice');
+  const noticeText   = document.getElementById('instagram-notice-text');
+  const noticeSuffix = document.getElementById('instagram-notice-suffix');
+  if (noticeText)   noticeText.textContent   = tr('instagramNotice');
+  if (noticeSuffix) noticeSuffix.textContent = tr('instagramNoticeSuffix');
 }
 
 function setPlaceholder(id, text) {
@@ -956,11 +977,13 @@ function renderCalendar() {
     const isPast    = date < today;
     const isWorking = CONFIG.workingDays.includes(date.getDay());
     const isTooSoon = (date.getTime() - now.getTime()) < CONFIG.minBookingHours * 3600000;
+    const isTooFar  = (date.getTime() - now.getTime()) > CONFIG.maxBookingDays * 86400000;
 
     if (isToday) el.classList.add('today');
 
-    if (isPast || !isWorking || isTooSoon) {
+    if (isPast || !isWorking || isTooSoon || isTooFar) {
       el.classList.add('dis');
+      if (isTooFar) el.classList.add('too-far');
     } else {
       if (selectedDate && fmtDate(selectedDate) === dateStr) el.classList.add('sel');
       el.addEventListener('click', () => onDateClick(date));
@@ -1025,9 +1048,12 @@ async function onDateClick(date) {
 function isSlotTaken(dateStr, slotTime, busyRanges) {
   const slotStart = new Date(dateStr + 'T' + slotTime + ':00').getTime();
   const slotEnd   = slotStart + CONFIG.sessionDurationMinutes * 60000;
+  const fromNow   = slotStart - Date.now();
 
   // Block slots less than minBookingHours away
-  if (slotStart - Date.now() < CONFIG.minBookingHours * 3600000) return true;
+  if (fromNow < CONFIG.minBookingHours * 3600000) return true;
+  // Block slots beyond maxBookingDays
+  if (fromNow > CONFIG.maxBookingDays * 86400000) return true;
 
   if (!busyRanges || !busyRanges.length) return false;
   return busyRanges.some(r => slotStart < r.end && slotEnd > r.start);
