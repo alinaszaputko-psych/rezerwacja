@@ -586,7 +586,7 @@ const CONFIG = {
 
   // Your Vercel deployment URL (origin only; no /api path). Calendar availability is read server-side.
   // Example: "https://psychology-booking-api.vercel.app"
-  apiBaseUrl:        "https://booking-backend-ca89udcff-alinaszaputko-psychs-projects.vercel.app",
+  apiBaseUrl:        "https://booking-backend-kappa-drab.vercel.app",
 
   defaultLanguage: "pl",
 };
@@ -1234,10 +1234,10 @@ async function showConfirmScreen(sessionId) {
   document.getElementById('confirm-summary').innerHTML = '';
   showScreen('confirm');
 
-  if (!sessionId || !CONFIG.apiBaseUrl || CONFIG.apiBaseUrl.includes('booking-backend-ca89udcff-alinaszaputko-psychs-projects.vercel.app')) {
-    document.getElementById('confirm-sub').textContent = tr('paymentStatusError');
-    return;
-  }
+  if (!sessionId || !CONFIG.apiBaseUrl) {
+  document.getElementById('confirm-sub').textContent = tr('paymentStatusError');
+  return;
+}
 
   // Poll status for up to ~45 seconds. The webhook, not this page, creates the event.
   let renderedCalendarEvent = false;
