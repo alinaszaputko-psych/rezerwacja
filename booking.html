@@ -586,7 +586,7 @@ const CONFIG = {
 
   // Your Vercel deployment URL (origin only; no /api path). Calendar availability is read server-side.
   // Example: "https://psychology-booking-api.vercel.app"
-  apiBaseUrl:        "https://YOUR-VERCEL-PROJECT.vercel.app",
+  apiBaseUrl:        "https://booking-backend-ca89udcff-alinaszaputko-psychs-projects.vercel.app",
 
   defaultLanguage: "pl",
 };
@@ -1234,7 +1234,7 @@ async function showConfirmScreen(sessionId) {
   document.getElementById('confirm-summary').innerHTML = '';
   showScreen('confirm');
 
-  if (!sessionId || !CONFIG.apiBaseUrl || CONFIG.apiBaseUrl.includes('YOUR-VERCEL-PROJECT')) {
+  if (!sessionId || !CONFIG.apiBaseUrl || CONFIG.apiBaseUrl.includes('booking-backend-ca89udcff-alinaszaputko-psychs-projects.vercel.app')) {
     document.getElementById('confirm-sub').textContent = tr('paymentStatusError');
     return;
   }
