@@ -459,7 +459,7 @@
     <div class="card">
       <div class="card-title">💬 <span data-t="sectionSession"></span></div>
       <div class="field" id="f-problem">
-        <label><span data-t="labelProblem"></span><span class="required">*</span></label>
+        <label><span data-t="labelProblem"></span></label>
         <textarea id="inp-problem"></textarea>
         <div class="err-msg" data-t="errRequired"></div>
       </div>
@@ -565,6 +565,7 @@ const CONFIG = {
 
   // Session settings
   sessionDurationMinutes: 60,
+  timeZone:               "Europe/Warsaw",
   sessionPrice:           160,
   currency:               "PLN",
 
@@ -583,22 +584,9 @@ const CONFIG = {
     ru: "https://psychologwroclaw.org/pravila/",   // ← replace with your actual URL
   },
 
-  // Stripe ─ create a Payment Link in your Stripe dashboard,
-  //   set its Success URL to: https://yoursite.com/booking.html?status=paid
-  stripePaymentLinkUrl: "https://buy.stripe.com/00wdRbeGN8Nj4Dwb3hc7u00",
-
-  // Google Calendar — API key for reading availability (public calendar)
-  // Created in Google Cloud Console → APIs & Services → Credentials
-  googleApiKey:      "AIzaSyDsQxcHMTOj_eTKWpyJV5zJ4hSS5_PT1Vw",
-  googleCalendarId:  "gorbachovaalina@gmail.com",
-
-  // Shared secret — must match BOOKING_SECRET in Vercel environment variables
-  // Prevents unauthorised use of your Vercel endpoint
-  bookingSecret: "sesja-code-Akfh&395^904HTdfr",
-
-  // Vercel backend URL — paste your Vercel deployment URL here after deploying
-  // e.g. "https://booking-backend-yourname.vercel.app/api/create-event"
-  vercelApiUrl: "https://booking-backend-kappa-drab.vercel.app/api/create-event",
+  // Your Vercel deployment URL (origin only; no /api path). Calendar availability is read server-side.
+  // Example: "https://psychology-booking-api.vercel.app"
+  apiBaseUrl:        "https://YOUR-VERCEL-PROJECT.vercel.app",
 
   defaultLanguage: "pl",
 };
@@ -617,7 +605,7 @@ const T = {
     labelName:        "Imię i nazwisko",
     labelEmail:       "Adres e-mail",
     labelPhone:       "Numer telefonu (opcjonalnie)",
-    labelProblem:     "Nad czym chcesz popracować?",
+    labelProblem:     "Jeśli chcesz, opisz krótko cel spotkania (opcjonalnie; odpowiedź nie jest zapisywana w systemie rezerwacji).",
     labelSessionType: "Rodzaj sesji (opcjonalnie)",
     labelTime:        "Wybierz godzinę",
     labelPrice:       "Do zapłaty",
@@ -638,6 +626,13 @@ const T = {
     paymentNotice:  "Zostaniesz przekierowany/a na bezpieczną stronę płatności Stripe.",
     confirmTitle:   "Dziękuję za rezerwację!",
     confirmSubMsg:  "Potwierdzenie zostało wysłane na Twój adres e-mail.",
+    paymentProcessing: "Płatność została przekazana do weryfikacji. Potwierdzenie rezerwacji pojawi się tutaj po utworzeniu wydarzenia w kalendarzu.",
+    paymentCalendarCreated: "Rezerwacja jest już w kalendarzu. Kończę wysyłanie wiadomości e-mail.",
+    paymentConfirmed: "rezerwacja jest potwierdzona. Wysłaliśmy wiadomość e-mail.",
+    paymentRefunded: "Termin stał się niedostępny po płatności. Zwrot płatności został zainicjowany. Skontaktujemy się z Tobą, jeśli będzie to konieczne.",
+    paymentStatusError: "Nie możemy teraz sprawdzić statusu rezerwacji. Nie dokonuj ponownej płatności; skontaktuj się z psychologiem, podając potwierdzenie płatności.",
+    paymentInitError: "Nie udało się rozpocząć płatności. Spróbuj ponownie.",
+    paymentSlotUnavailable: "Ten termin nie jest już dostępny. Wybierz inny termin.",
 
     summaryDate:     "Data",
     summaryTime:     "Godzina",
@@ -647,13 +642,14 @@ const T = {
 
     slotsLoading: "Sprawdzam dostępność…",
     slotsNone:    "Brak wolnych terminów tego dnia. Wybierz inny dzień.",
+    slotsAvailabilityError: "Nie udało się sprawdzić dostępności. Odśwież stronę lub spróbuj ponownie za chwilę.",
 
     authRequired:  "Aby dokończyć rezerwację, zaloguj się do Google (wymagane do utworzenia wydarzenia w kalendarzu).",
     authBtn:       "Zaloguj się przez Google →",
     creatingEvent: "Tworzę wydarzenie w kalendarzu…",
     confirmSubMsg: "Wydarzenie zostało dodane do Twojego kalendarza Google wraz z linkiem do sesji.",
 
-    gdprText: "Wyrażam zgodę na przetwarzanie moich danych osobowych (w tym danych dotyczących zdrowia psychicznego) przez Alinę Szaputko wyłącznie w celu realizacji sesji psychologicznej. Dane nie będą udostępniane osobom trzecim. Zgoda jest dobrowolna i można ją wycofać w każdej chwili, pisząc na adres: gorbachovaalina@gmail.com",
+    gdprText: "Wyrażam zgodę na przetwarzanie moich danych osobowych przez Alinę Szaputko w celu obsługi rezerwacji, płatności i organizacji sesji. Dane niezbędne do tych celów mogą być przekazywane dostawcom usług technicznych, płatniczych i kalendarzowych zgodnie z polityką prywatności. Pole dotyczące celu sesji jest opcjonalne, a jego treść nie jest wysyłana do systemu rezerwacji. Zgodę mogę wycofać, pisząc na adres: gorbachovaalina@gmail.com. Treść zgody i politykę prywatności należy zweryfikować przed uruchomieniem produkcyjnym.",
     gdprErr:  "Prosimy o wyrażenie zgody na przetwarzanie danych, aby kontynuować.",
     policyLinkText: "Zapoznaj się z zasadami rezerwacji i anulowania wizyt →",
     instagramNotice:       "Nie widzisz odpowiedniego terminu lub masz pytania? Napisz do mnie na Instagramie: ",
@@ -677,7 +673,7 @@ const T = {
     labelName:        "Имя и фамилия",
     labelEmail:       "Электронная почта",
     labelPhone:       "Номер телефона (необязательно)",
-    labelProblem:     "Над чем ты хочешь поработать?",
+    labelProblem:     "Если хочешь, кратко опиши цель встречи (необязательно; ответ не сохраняется в системе записи).",
     labelSessionType: "Тип сессии (необязательно)",
     labelTime:        "Выбери время",
     labelPrice:       "К оплате",
@@ -698,6 +694,13 @@ const T = {
     paymentNotice:  "Сейчас тебя перенаправит на защищённую страницу оплаты Stripe.",
     confirmTitle:   "Спасибо за запись!",
     confirmSubMsg:  "Подтверждение отправлено на твою электронную почту.",
+    paymentProcessing: "Платёж проверяется. Подтверждение записи появится здесь после создания события в календаре.",
+    paymentCalendarCreated: "Запись уже добавлена в календарь. Завершается отправка электронных писем.",
+    paymentConfirmed: "запись подтверждена. Мы отправили письмо на электронную почту.",
+    paymentRefunded: "После оплаты выбранное время стало недоступным. Возврат средств инициирован. При необходимости мы свяжемся с вами.",
+    paymentStatusError: "Сейчас не удаётся проверить статус записи. Не оплачивайте повторно; свяжитесь с психологом и укажите подтверждение оплаты.",
+    paymentInitError: "Не удалось начать оплату. Попробуйте ещё раз.",
+    paymentSlotUnavailable: "Это время больше недоступно. Выберите другое время.",
 
     summaryDate:     "Дата",
     summaryTime:     "Время",
@@ -707,13 +710,14 @@ const T = {
 
     slotsLoading: "Проверяю доступность…",
     slotsNone:    "Нет свободных слотов на этот день. Выбери другой день.",
+    slotsAvailabilityError: "Не удалось проверить доступность. Обнови страницу или попробуй позже.",
 
     authRequired:  "Чтобы завершить запись, войдите через Google (необходимо для создания события в календаре).",
     authBtn:       "Войти через Google →",
     creatingEvent: "Создаю событие в календаре…",
     confirmSubMsg: "Событие добавлено в твой Google Календарь вместе со ссылкой на сессию.",
 
-    gdprText: "Я даю согласие на обработку моих персональных данных (включая данные о психическом здоровье) Алиной Шапутько исключительно в целях проведения психологической сессии. Данные не будут переданы третьим лицам. Согласие является добровольным и может быть отозвано в любое время по адресу: gorbachovaalina@gmail.com",
+    gdprText: "Я даю согласие на обработку моих персональных данных Алиной Шапутько для обработки записи, оплаты и организации сессии. Необходимые для этих целей данные могут передаваться поставщикам технических, платёжных и календарных услуг в соответствии с политикой конфиденциальности. Поле о цели сессии необязательное, и его содержание не отправляется в систему записи. Согласие можно отозвать, написав на адрес: gorbachovaalina@gmail.com. Перед запуском необходимо проверить формулировку согласия и политику конфиденциальности.",
     gdprErr:  "Пожалуйста, дайте согласие на обработку данных, чтобы продолжить.",
     policyLinkText: "Ознакомьтесь с правилами записи и отмены сессий →",
     instagramNotice:       "Не видишь подходящего окошка или есть вопросы? Напиши мне в Инстаграм: ",
@@ -736,6 +740,7 @@ let calYear, calMonth;
 let selectedDate = null;
 let selectedTime = null;
 let busyCache    = {};
+let availabilityLoadedMonths = new Set();
 let pendingBooking = null;
 
 // ╔══════════════════════════════════════════════════════════╗
@@ -817,104 +822,54 @@ function setPlaceholder(id, text) {
 }
 
 // ╔══════════════════════════════════════════════════════════╗
-// ║  GOOGLE CALENDAR — read availability (API key, public)  ║
+// ║  GOOGLE CALENDAR — read availability (server-side API)  ║
 // ╚══════════════════════════════════════════════════════════╝
-let gapiReady = false;
-
-function initGapi() {
-  if (!CONFIG.googleApiKey || CONFIG.googleApiKey === 'REPLACE_ME') return;
-  gapi.load('client', async () => {
-    await gapi.client.init({
-      apiKey: CONFIG.googleApiKey,
-      discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
-    });
-    gapiReady = true;
-    // Pre-fetch this month's busy slots and re-render calendar once API is ready
-    await prefetchMonth(calYear, calMonth);
-    renderCalendar();
-  });
-}
-
-// Fetch ALL events for an entire month in one API call
+// Calendar availability is read through the backend. The browser receives only busy time
+// ranges (never event titles, descriptions, attendee details or the private Calendar ID).
 async function prefetchMonth(year, month) {
-  if (!gapiReady) return;
-  const monthStart = new Date(year, month, 1);
-  const monthEnd   = new Date(year, month + 1, 0, 23, 59, 59);
+  const monthKey = `${year}-${pad(month + 1)}`;
+  if (availabilityLoadedMonths.has(monthKey)) return;
+
   try {
-    const resp = await gapi.client.calendar.events.list({
-      calendarId:   CONFIG.googleCalendarId,
-      timeMin:      monthStart.toISOString(),
-      timeMax:      monthEnd.toISOString(),
-      singleEvents: true,
-      orderBy:      'startTime',
-      maxResults:   250,
-    });
-    // Group events by date into busyCache
-    for (const ev of (resp.result.items || [])) {
-      if (!ev.start) continue;
-      const dateStr = (ev.start.dateTime || ev.start.date).slice(0, 10);
-      if (!busyCache[dateStr]) busyCache[dateStr] = [];
-      busyCache[dateStr].push({
-        start: ev.start.dateTime
-          ? new Date(ev.start.dateTime).getTime()
-          : new Date(dateStr + 'T00:00:00').getTime(),
-        end: ev.end.dateTime
-          ? new Date(ev.end.dateTime).getTime()
-          : new Date(dateStr + 'T23:59:59').getTime(),
-      });
-    }
-    // Mark days with no events as empty arrays so we don't re-fetch them
+    const response = await fetch(`${CONFIG.apiBaseUrl}/api/availability?month=${monthKey}`, { cache: 'no-store' });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !Array.isArray(data.busyRanges)) throw new Error(data.message || 'Availability could not be loaded');
+
+    const ranges = data.busyRanges
+      .map(item => ({ start: Number(item.startWallMs), end: Number(item.endWallMs) }))
+      .filter(item => Number.isFinite(item.start) && Number.isFinite(item.end) && item.end > item.start);
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const pad = n => String(n).padStart(2, '0');
     for (let d = 1; d <= daysInMonth; d++) {
-      const key = `${year}-${pad(month + 1)}-${pad(d)}`;
-      if (busyCache[key] === undefined) busyCache[key] = [];
+      const date = new Date(year, month, d);
+      const key = fmtDate(date);
+      const dayStart = Date.UTC(year, month, d, 0, 0, 0, 0);
+      const dayEnd = Date.UTC(year, month, d + 1, 0, 0, 0, 0);
+      busyCache[key] = ranges.filter(range => range.start < dayEnd && range.end > dayStart);
     }
-  } catch (e) {
-    console.warn('Calendar prefetch error:', e);
+    availabilityLoadedMonths.add(monthKey);
+  } catch (error) {
+    console.warn('Calendar availability could not be loaded:', error);
   }
 }
 
 async function fetchBusySlots(dateStr) {
   if (busyCache[dateStr] !== undefined) return busyCache[dateStr];
-  if (!gapiReady) { busyCache[dateStr] = []; return []; }
-  // Single-day fallback (e.g. when navigating to next month before prefetch)
-  const dayStart = new Date(dateStr + 'T00:00:00');
-  const dayEnd   = new Date(dateStr + 'T23:59:59');
-  try {
-    const resp = await gapi.client.calendar.events.list({
-      calendarId:   CONFIG.googleCalendarId,
-      timeMin:      dayStart.toISOString(),
-      timeMax:      dayEnd.toISOString(),
-      singleEvents: true,
-      orderBy:      'startTime',
-    });
-    const ranges = (resp.result.items || [])
-      .filter(ev => ev.start && (ev.start.dateTime || ev.start.date))
-      .map(ev => ({
-        start: ev.start.dateTime
-          ? new Date(ev.start.dateTime).getTime()
-          : new Date(dateStr + 'T00:00:00').getTime(),
-        end: ev.end.dateTime
-          ? new Date(ev.end.dateTime).getTime()
-          : new Date(dateStr + 'T23:59:59').getTime(),
-      }));
-    busyCache[dateStr] = ranges;
-    return ranges;
-  } catch (e) {
-    console.warn('Calendar API error:', e);
-    busyCache[dateStr] = [];
-    return [];
-  }
+  const [year, month] = dateStr.split('-').map(Number);
+  await prefetchMonth(year, month - 1);
+  if (busyCache[dateStr] !== undefined) return busyCache[dateStr];
+  throw new Error('Availability unavailable');
 }
 
 // ╔══════════════════════════════════════════════════════════╗
 // ║  CALENDAR                                               ║
 // ╚══════════════════════════════════════════════════════════╝
 function initCalendar() {
-  const now = new Date();
-  calYear  = now.getFullYear();
-  calMonth = now.getMonth();
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: CONFIG.timeZone, year: 'numeric', month: '2-digit',
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  calYear = Number(values.year);
+  calMonth = Number(values.month) - 1;
   renderCalendar();
 }
 
@@ -945,9 +900,13 @@ function renderCalendar() {
     grid.appendChild(h);
   });
 
-  const now   = new Date();
-  const today = new Date();
-  today.setHours(0,0,0,0);
+  const now = new Date();
+  const todayParts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: CONFIG.timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(now);
+  const todayValues = Object.fromEntries(todayParts.map(part => [part.type, part.value]));
+  const todayStr = `${todayValues.year}-${todayValues.month}-${todayValues.day}`;
+  const today = new Date(`${todayStr}T00:00:00`);
 
   const firstDay   = new Date(calYear, calMonth, 1);
   const daysInMon  = new Date(calYear, calMonth + 1, 0).getDate();
@@ -973,11 +932,14 @@ function renderCalendar() {
     el.className  = 'cal-day';
     el.textContent = d;
 
-    const isToday   = date.getTime() === today.getTime();
-    const isPast    = date < today;
+    const isToday   = dateStr === todayStr;
+    const isPast    = dateStr < todayStr;
     const isWorking = CONFIG.workingDays.includes(date.getDay());
-    const isTooSoon = (date.getTime() - now.getTime()) < CONFIG.minBookingHours * 3600000;
-    const isTooFar  = (date.getTime() - now.getTime()) > CONFIG.maxBookingDays * 86400000;
+    const allSlotsForDay = generateSlots();
+    const firstSlotStart = allSlotsForDay.length ? wallTimeToUtcMs(dateStr, allSlotsForDay[0]) : NaN;
+    const lastSlotStart  = allSlotsForDay.length ? wallTimeToUtcMs(dateStr, allSlotsForDay[allSlotsForDay.length - 1]) : NaN;
+    const isTooSoon = !Number.isFinite(lastSlotStart) || (lastSlotStart - now.getTime()) < CONFIG.minBookingHours * 3600000;
+    const isTooFar  = !Number.isFinite(firstSlotStart) || (firstSlotStart - now.getTime()) > CONFIG.maxBookingDays * 86400000;
 
     if (isToday) el.classList.add('today');
 
@@ -1006,8 +968,9 @@ function renderCalendar() {
 }
 
 function disableFullyBookedDays(year, month, daysInMon, today, grid) {
-  // Cache is already populated by prefetchMonth — this runs synchronously
-  if (!gapiReady) return;
+  // Only disable days from a month whose busy ranges were loaded successfully.
+  const monthKey = `${year}-${pad(month + 1)}`;
+  if (!availabilityLoadedMonths.has(monthKey)) return;
   const allSlots = generateSlots();
   if (!allSlots.length) return;
 
@@ -1041,13 +1004,21 @@ async function onDateClick(date) {
   container.innerHTML = `<div class="slots-msg">${tr('slotsLoading')}</div>`;
 
   const dateStr = fmtDate(date);
-  const taken   = await fetchBusySlots(dateStr);
-  renderSlots(date, taken);
+  try {
+    const taken = await fetchBusySlots(dateStr);
+    renderSlots(date, taken);
+  } catch (error) {
+    console.warn('Selected date availability unavailable:', error);
+    container.innerHTML = `<div class="slots-msg">${tr('slotsAvailabilityError')}</div>`;
+  }
 }
 
 function isSlotTaken(dateStr, slotTime, busyRanges) {
-  const slotStart = new Date(dateStr + 'T' + slotTime + ':00').getTime();
-  const slotEnd   = slotStart + CONFIG.sessionDurationMinutes * 60000;
+  const slotStart = wallTimeToUtcMs(dateStr, slotTime);
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const [hour, minute] = slotTime.split(':').map(Number);
+  const slotWallStart = Date.UTC(year, month - 1, day, hour, minute);
+  const slotWallEnd = slotWallStart + CONFIG.sessionDurationMinutes * 60000;
   const fromNow   = slotStart - Date.now();
 
   // Block slots less than minBookingHours away
@@ -1056,7 +1027,7 @@ function isSlotTaken(dateStr, slotTime, busyRanges) {
   if (fromNow > CONFIG.maxBookingDays * 86400000) return true;
 
   if (!busyRanges || !busyRanges.length) return false;
-  return busyRanges.some(r => slotStart < r.end && slotEnd > r.start);
+  return busyRanges.some(r => slotWallStart < r.end && slotWallEnd > r.start);
 }
 
 function renderSlots(date, takenOverride) {
@@ -1133,7 +1104,6 @@ function submitForm() {
   const name    = document.getElementById('inp-name').value.trim();
   const email   = document.getElementById('inp-email').value.trim();
   const phone   = document.getElementById('inp-phone').value.trim();
-  const problem = document.getElementById('inp-problem').value.trim();
   const stype   = document.getElementById('inp-type').value;
 
   if (!name)  { setFieldErr('f-name', 'errRequired');   ok = false; }
@@ -1146,8 +1116,7 @@ function submitForm() {
     ok = false;
   } else clearFieldErr('f-email');
 
-  if (!problem) { setFieldErr('f-problem', 'errRequired'); ok = false; }
-  else            clearFieldErr('f-problem');
+  clearFieldErr('f-problem');
 
   const grid = document.getElementById('cal-grid');
   if (!selectedDate) {
@@ -1177,7 +1146,7 @@ function submitForm() {
 
   // Build and persist booking
   const b = {
-    name, email, phone, problem,
+    name, email, phone,
     sessionType:  stype,
     date:         fmtDate(selectedDate),
     dateFriendly: fmtDateFriendly(selectedDate),
@@ -1186,12 +1155,13 @@ function submitForm() {
     currency:     CONFIG.currency,
     lang,
     ts:           Date.now(),
+    requestId:    (window.crypto && typeof window.crypto.randomUUID === 'function')
+      ? window.crypto.randomUUID() : `bkreq_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`,
   };
 
-  // Use localStorage (survives Stripe redirect in same tab)
-  localStorage.setItem('bk_pending', JSON.stringify(b));
+  // Do not create a reservation yet. The server reserves the slot atomically when the
+  // client clicks Pay and creates the Stripe Checkout Session.
   pendingBooking = b;
-
   showPaymentScreen(b);
 }
 
@@ -1218,43 +1188,92 @@ function showPaymentScreen(b) {
   showScreen('payment');
 }
 
-function goToStripe() {
+async function goToStripe() {
   const btn = document.getElementById('btn-pay');
+  if (!pendingBooking) return;
   btn.innerHTML = `<span class="spinner"></span>${tr('btnPay')}`;
   btn.disabled = true;
 
-  // Pass a reference ID to Stripe (visible in dashboard)
-  const ref = encodeURIComponent([
-    pendingBooking.date,
-    pendingBooking.time.replace(':','-'),
-    pendingBooking.email,
-  ].join('_'));
-
-  window.location.href = `${CONFIG.stripePaymentLinkUrl}?client_reference_id=${ref}`;
+  try {
+    const response = await fetch(`${CONFIG.apiBaseUrl}/api/create-checkout-session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: pendingBooking.name,
+        email: pendingBooking.email,
+        phone: pendingBooking.phone || '',
+        date: pendingBooking.date,
+        time: pendingBooking.time,
+        lang: pendingBooking.lang,
+        duration: CONFIG.sessionDurationMinutes,
+        gdprConsent: document.getElementById('inp-gdpr').checked,
+        requestId: pendingBooking.requestId,
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.url) {
+      const key = data.error === 'SLOT_UNAVAILABLE' ? 'paymentSlotUnavailable' : 'paymentInitError';
+      throw new Error(tr(key));
+    }
+    window.location.assign(data.url);
+  } catch (error) {
+    console.error('Could not create Stripe Checkout Session:', error);
+    btn.disabled = false;
+    btn.textContent = tr('btnPay');
+    alert(error.message || tr('paymentInitError'));
+  }
 }
 
 // ╔══════════════════════════════════════════════════════════╗
 // ║  CONFIRMATION SCREEN                                    ║
 // ╚══════════════════════════════════════════════════════════╝
-function showConfirmScreen() {
-  const raw = localStorage.getItem('bk_pending');
-  if (!raw) { showScreen('form'); return; }
-  const b = JSON.parse(raw);
-  if (Date.now() - b.ts > 7200000) {
-    localStorage.removeItem('bk_pending');
-    showScreen('form');
-    return;
-  }
-  if (b.lang && T[b.lang]) { lang = b.lang; setLang(lang); }
-  pendingBooking = b;
-  localStorage.removeItem('bk_pending');
-
-  // Show confirm screen immediately with available info
-  renderConfirmUI(b);
+async function showConfirmScreen(sessionId) {
+  const initialTitle = document.querySelector('[data-t="confirmTitle"]');
+  if (initialTitle) initialTitle.textContent = tr('confirmTitle');
+  document.getElementById('confirm-sub').textContent = tr('paymentProcessing');
+  document.getElementById('confirm-summary').innerHTML = '';
   showScreen('confirm');
 
-  // Then create the calendar event (triggers OAuth popup if needed)
-  createCalendarEvent(b);
+  if (!sessionId || !CONFIG.apiBaseUrl || CONFIG.apiBaseUrl.includes('YOUR-VERCEL-PROJECT')) {
+    document.getElementById('confirm-sub').textContent = tr('paymentStatusError');
+    return;
+  }
+
+  // Poll status for up to ~45 seconds. The webhook, not this page, creates the event.
+  let renderedCalendarEvent = false;
+  for (let attempt = 0; attempt < 18; attempt++) {
+    try {
+      const url = `${CONFIG.apiBaseUrl}/api/booking-status?session_id=${encodeURIComponent(sessionId)}`;
+      const response = await fetch(url, { method: 'GET' });
+      const data = await response.json().catch(() => ({}));
+
+      if (response.ok && data.paid && data.booking) {
+        if (data.status === 'refunded_calendar_conflict') {
+          document.getElementById('confirm-sub').textContent = tr('paymentRefunded');
+          return;
+        }
+        const booking = data.booking;
+        if ((data.status === 'calendar_created' || data.status === 'completed') && !renderedCalendarEvent) {
+          if (booking.lang && T[booking.lang]) { lang = booking.lang; setLang(lang); }
+          renderConfirmUI(booking);
+          if (data.meetLink || data.eventLink) showMeetLink(data.meetLink, data.eventLink);
+          renderedCalendarEvent = true;
+        }
+        if (data.status === 'completed') {
+          document.getElementById('confirm-sub').textContent = `${booking.name} — ${tr('paymentConfirmed')}`;
+          return;
+        }
+        if (data.status === 'calendar_created') {
+          document.getElementById('confirm-sub').textContent = tr('paymentCalendarCreated');
+        }
+      }
+    } catch (error) {
+      console.warn('Payment status check failed; will retry:', error);
+    }
+    await new Promise(resolve => setTimeout(resolve, 2500));
+  }
+  if (!renderedCalendarEvent) document.getElementById('confirm-sub').textContent = tr('paymentProcessing');
+  else document.getElementById('confirm-sub').textContent = tr('paymentCalendarCreated');
 }
 
 function renderConfirmUI(b) {
@@ -1281,52 +1300,6 @@ function renderConfirmUI(b) {
   // Hide add-to-cal button until event is created
   const calBtn = document.getElementById('btn-add-cal');
   if (calBtn) calBtn.style.display = 'none';
-}
-
-async function createCalendarEvent(b) {
-  // If Vercel URL not configured yet, fall back to deep link
-  if (!CONFIG.vercelApiUrl || CONFIG.vercelApiUrl === 'REPLACE_WITH_VERCEL_URL') {
-    showAddToCalFallback(b);
-    return;
-  }
-
-  // Show "creating…" spinner
-  const meetBox = document.getElementById('meet-box');
-  if (meetBox) {
-    meetBox.style.display = 'block';
-    meetBox.innerHTML = `<div style="color:var(--muted);font-size:13px;padding:8px 0;">⏳ ${tr('creatingEvent')}</div>`;
-  }
-
-  try {
-    const resp = await fetch(CONFIG.vercelApiUrl, {
-      method:  'POST',
-      headers: {
-        'Content-Type':      'application/json',
-        'X-Booking-Secret':  CONFIG.bookingSecret,
-      },
-      body: JSON.stringify({
-        name:     b.name,
-        email:    b.email,
-        phone:    b.phone || '',
-        problem:  b.problem,
-        date:     b.date,
-        time:     b.time,
-        duration: CONFIG.sessionDurationMinutes,
-        lang:     b.lang,
-      }),
-    });
-
-    const data = await resp.json();
-
-    if (data.success && data.meetLink) {
-      showMeetLink(data.meetLink, data.eventLink);
-    } else {
-      showAddToCalFallback(b);
-    }
-  } catch (err) {
-    console.warn('Vercel API error:', err);
-    showAddToCalFallback(b);
-  }
 }
 
 function showMeetLink(meetLink, eventLink) {
@@ -1356,26 +1329,6 @@ function showMeetLink(meetLink, eventLink) {
   }
 }
 
-function showAddToCalFallback(b) {
-  // No OAuth — show the deep-link "Add to Google Calendar" button instead
-  const [y, mo, d] = b.date.split('-').map(Number);
-  const [h, m]     = b.time.split(':').map(Number);
-  const start = new Date(y, mo-1, d, h, m);
-  const end   = new Date(start.getTime() + CONFIG.sessionDurationMinutes * 60000);
-  const fmtGCal = dt => dt.toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');
-  const url = 'https://calendar.google.com/calendar/render?action=TEMPLATE'
-    + `&text=${encodeURIComponent('Sesja – ' + CONFIG.therapistName)}`
-    + `&dates=${fmtGCal(start)}/${fmtGCal(end)}`
-    + `&details=${encodeURIComponent(b.problem)}`
-    + `&add=${encodeURIComponent(b.email)}`;
-
-  const calBtn = document.getElementById('btn-add-cal');
-  if (calBtn) { calBtn.href = url; calBtn.style.display = 'flex'; }
-
-  const meetBox = document.getElementById('meet-box');
-  if (meetBox) meetBox.style.display = 'none';
-}
-
 // ╔══════════════════════════════════════════════════════════╗
 // ║  SCREEN ROUTING                                         ║
 // ╚══════════════════════════════════════════════════════════╝
@@ -1386,11 +1339,25 @@ function showScreen(name) {
 }
 
 function handleUrlParams() {
-  const p = new URLSearchParams(window.location.search);
-  const status = p.get('status') || p.get('booking');
-  if (status === 'paid' || status === 'success') {
+  const params = new URLSearchParams(window.location.search);
+  const status = params.get('status');
+  if (status === 'success') {
+    const sessionId = params.get('session_id') || '';
+    // Keep session_id in the URL so a refresh can safely check the same payment again.
+    showConfirmScreen(sessionId);
+    return true;
+  }
+  if (status === 'cancelled') {
+    const bookingId = params.get('booking_id') || '';
     window.history.replaceState({}, '', window.location.pathname);
-    showConfirmScreen();
+    showScreen('form');
+    if (bookingId) {
+      fetch(`${CONFIG.apiBaseUrl}/api/cancel-booking`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId }),
+      }).catch(error => console.warn('Could not cancel unpaid slot hold:', error));
+    }
     return true;
   }
   return false;
@@ -1400,6 +1367,23 @@ function handleUrlParams() {
 // ║  HELPERS                                                ║
 // ╚══════════════════════════════════════════════════════════╝
 function pad(n) { return String(n).padStart(2, '0'); }
+
+function wallTimeToUtcMs(dateText, timeText) {
+  const [year, month, day] = dateText.split('-').map(Number);
+  const [hour, minute] = timeText.split(':').map(Number);
+  const target = Date.UTC(year, month - 1, day, hour, minute, 0);
+  let guess = target;
+  for (let i = 0; i < 4; i++) {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: CONFIG.timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    }).formatToParts(new Date(guess));
+    const value = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    const represented = Date.UTC(Number(value.year), Number(value.month) - 1, Number(value.day), Number(value.hour), Number(value.minute));
+    guess += target - represented;
+  }
+  return guess;
+}
 
 function fmtDate(d) {
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
@@ -1422,15 +1406,10 @@ window.addEventListener('load', () => {
   lang = detectLang();
   setLang(lang);
   initCalendar();
+  prefetchMonth(calYear, calMonth).then(() => renderCalendar());
   if (!handleUrlParams()) showScreen('form');
 });
-
-// Google API callback
-window.gapiOnload = initGapi;
 </script>
-
-<!-- Google API client (read calendar availability) -->
-<script async defer src="https://apis.google.com/js/api.js?onload=gapiOnload"></script>
 
 </body>
 </html>
