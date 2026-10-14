@@ -1,0 +1,1415 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rezerwacja sesji</title>
+  <style>
+    /* ── Design tokens ── */
+    :root {
+      --bg:           #f5f2ed;
+      --card:         #ffffff;
+      --accent:       #6b9a7f;
+      --accent-dark:  #4d7a62;
+      --accent-light: #e8f2ec;
+      --text:         #2a2a2a;
+      --muted:        #6b6b6b;
+      --border:       #dcd8d0;
+      --error:        #c0392b;
+      --radius-card:  16px;
+      --radius-input: 10px;
+      --shadow:       0 2px 10px rgba(0,0,0,.07);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 12px 12px 40px;
+      line-height: 1.5;
+    }
+
+    .container { max-width: 520px; margin: 0 auto; }
+
+    /* ── Language bar ── */
+    .lang-bar {
+      display: flex;
+      justify-content: flex-end;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .lang-btn {
+      padding: 4px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 20px;
+      background: var(--card);
+      font-size: 13px;
+      cursor: pointer;
+      color: var(--muted);
+      transition: all .15s;
+    }
+    .lang-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    /* ── Therapist header ── */
+    .therapist-card {
+      background: var(--card);
+      border-radius: var(--radius-card);
+      padding: 22px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 14px;
+      box-shadow: var(--shadow);
+    }
+    .therapist-avatar {
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: var(--accent-light);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 30px;
+      overflow: hidden;
+    }
+    .therapist-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .therapist-info h1 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+    .therapist-welcome { font-size: 14px; color: var(--muted); }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--card);
+      border-radius: var(--radius-card);
+      padding: 20px;
+      box-shadow: var(--shadow);
+      margin-bottom: 14px;
+    }
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--accent-dark);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ── Form fields ── */
+    .field { margin-bottom: 14px; }
+    .field:last-child { margin-bottom: 0; }
+    .field label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 5px;
+    }
+    .required { color: var(--error); margin-left: 2px; }
+    .field input,
+    .field textarea,
+    .field select {
+      width: 100%;
+      padding: 11px 13px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-input);
+      font-size: 15px;
+      font-family: inherit;
+      background: #fff;
+      color: var(--text);
+      transition: border-color .15s;
+      -webkit-appearance: none;
+    }
+    .field input:focus,
+    .field textarea:focus,
+    .field select:focus { outline: none; border-color: var(--accent); }
+    .field textarea { resize: vertical; min-height: 85px; }
+    .field select { cursor: pointer; }
+    .err-msg {
+      font-size: 12px;
+      color: var(--error);
+      margin-top: 4px;
+      display: none;
+    }
+    .field.has-err input,
+    .field.has-err textarea,
+    .field.has-err select { border-color: var(--error); }
+    .field.has-err .err-msg { display: block; }
+
+    /* ── Calendar ── */
+    .cal-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .cal-nav-btn {
+      width: 34px;
+      height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      background: none;
+      cursor: pointer;
+      font-size: 18px;
+      color: var(--text);
+      transition: background .1s;
+    }
+    .cal-nav-btn:hover { background: var(--accent-light); }
+    .cal-month { font-weight: 600; font-size: 15px; }
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 3px;
+    }
+    .cal-hdr {
+      text-align: center;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      padding: 3px 0 5px;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+    }
+    .cal-day {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      border: 1.5px solid transparent;
+      transition: all .1s;
+      user-select: none;
+    }
+    .cal-day:hover:not(.dis):not(.other) { background: var(--accent-light); border-color: var(--accent); }
+    .cal-day.sel { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .cal-day.today { border-color: var(--accent); font-weight: 700; }
+    .cal-day.dis { color: var(--muted); cursor: not-allowed; opacity: .38; }
+    .cal-day.fully-booked { color: var(--muted); cursor: not-allowed; opacity: .38; }
+    .cal-day.fully-booked::after { content: "•"; display: block; font-size: 7px; line-height:1; color: var(--error); margin-top: -2px; }
+    .cal-day.other { color: var(--border); cursor: default; }
+    .cal-err { outline: 2px solid var(--error); border-radius: 8px; }
+
+    /* ── Time slots ── */
+    #slots-section { margin-top: 18px; display: none; }
+    .slots-label { font-size: 13px; font-weight: 500; margin-bottom: 8px; display: block; }
+    .slots-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .slot {
+      padding: 10px 4px;
+      text-align: center;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all .12s;
+    }
+    .slot:hover:not(.taken) { border-color: var(--accent); background: var(--accent-light); }
+    .slot.sel { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .slot.taken {
+      background: #f0eeeb;
+      color: var(--border);
+      cursor: not-allowed;
+      text-decoration: line-through;
+    }
+    .slots-msg {
+      text-align: center;
+      padding: 18px;
+      color: var(--muted);
+      font-size: 14px;
+      background: var(--accent-light);
+      border-radius: 10px;
+    }
+    .slots-err { outline: 2px solid var(--error); border-radius: 10px; }
+
+    /* ── Price box ── */
+    .price-box {
+      background: var(--accent-light);
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .price-lbl { font-size: 14px; color: var(--muted); }
+    .price-amt { font-size: 24px; font-weight: 700; color: var(--accent-dark); }
+
+    /* ── Summary rows ── */
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+    }
+    .summary-row:last-child { border-bottom: none; }
+    .summary-row .lbl { color: var(--muted); }
+    .summary-row .val { font-weight: 500; text-align: right; max-width: 60%; }
+
+    /* ── Notice ── */
+    .notice {
+      background: var(--accent-light);
+      border-left: 3px solid var(--accent);
+      padding: 10px 13px;
+      border-radius: 0 8px 8px 0;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    /* ── GDPR consent ── */
+    .gdpr-box {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      background: var(--accent-light);
+      border-radius: 10px;
+      padding: 13px 14px;
+      margin-bottom: 14px;
+    }
+    .gdpr-box input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      min-width: 18px;
+      margin-top: 2px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .gdpr-box label {
+      font-size: 12.5px;
+      color: var(--muted);
+      line-height: 1.5;
+      cursor: pointer;
+    }
+    .gdpr-box.has-err { outline: 2px solid var(--error); }
+    .gdpr-err {
+      font-size: 12px;
+      color: var(--error);
+      margin-top: 5px;
+      display: none;
+    }
+    .gdpr-box.has-err + .gdpr-err { display: block; }
+
+    /* ── Buttons ── */
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background .15s, color .15s;
+      border: none;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-dark); }
+    .btn-primary:disabled { background: var(--border); cursor: not-allowed; }
+    .btn-secondary {
+      background: #fff;
+      color: var(--accent-dark);
+      border: 1.5px solid var(--accent);
+      margin-top: 10px;
+    }
+    .btn-secondary:hover { background: var(--accent-light); }
+    .btn-cal {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-decoration: none;
+      background: #fff;
+      color: var(--accent-dark);
+      border: 1.5px solid var(--accent);
+      padding: 13px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 500;
+      margin-top: 10px;
+    }
+    .btn-cal:hover { background: var(--accent-light); }
+
+    /* ── Confirmation ── */
+    .confirm-wrap { text-align: center; padding: 8px 0 16px; }
+    .confirm-icon { font-size: 56px; margin-bottom: 12px; }
+    .confirm-title { font-size: 21px; font-weight: 700; margin-bottom: 6px; }
+    .confirm-sub { font-size: 14px; color: var(--muted); margin-bottom: 22px; line-height: 1.5; }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,.35);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Screens ── */
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    /* ── Instagram notice ── */
+    .instagram-notice {
+      padding: 14px 16px;
+      background: var(--accent-light);
+      border-left: 3px solid var(--accent);
+      margin-bottom: 12px;
+    }
+    .instagram-notice-inner {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .instagram-notice-icon {
+      font-size: 20px;
+      line-height: 1.4;
+      flex-shrink: 0;
+    }
+    .instagram-notice div {
+      font-size: 13.5px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .instagram-notice a {
+      color: var(--accent);
+      font-weight: 600;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .instagram-notice a:hover { text-decoration: underline; }
+
+    /* ── Responsive ── */
+    @media (max-width: 380px) {
+      .slots-grid { grid-template-columns: repeat(2, 1fr); }
+      .therapist-card { flex-direction: column; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Language switcher -->
+  <div class="lang-bar">
+    <button class="lang-btn" id="btn-pl" onclick="setLang('pl')">Polski</button>
+    <button class="lang-btn" id="btn-ru" onclick="setLang('ru')">Русский</button>
+  </div>
+
+  <!-- Therapist header -->
+  <div class="therapist-card">
+    <div class="therapist-avatar" id="therapist-avatar"></div>
+    <div class="therapist-info">
+      <h1 id="therapist-name"></h1>
+      <p class="therapist-welcome" id="therapist-welcome"></p>
+    </div>
+  </div>
+
+  <!-- Instagram notice -->
+  <div class="card instagram-notice" id="instagram-notice">
+    <div class="instagram-notice-inner">
+      <span class="instagram-notice-icon">💬</span>
+      <div>
+        <span id="instagram-notice-text"></span>
+        <a href="https://www.instagram.com/alinaszaputko" target="_blank" rel="noopener"
+           id="instagram-link">@alinaszaputko</a>
+        <span id="instagram-notice-suffix"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SCREEN 1: Booking form ── -->
+  <div class="screen" id="screen-form">
+
+    <div class="card">
+      <div class="card-title">👤 <span data-t="sectionPersonal"></span></div>
+      <div class="field" id="f-name">
+        <label><span data-t="labelName"></span><span class="required">*</span></label>
+        <input type="text" id="inp-name" autocomplete="name">
+        <div class="err-msg" data-t="errRequired"></div>
+      </div>
+      <div class="field" id="f-email">
+        <label><span data-t="labelEmail"></span><span class="required">*</span></label>
+        <input type="email" id="inp-email" autocomplete="email" inputmode="email">
+        <div class="err-msg" id="email-err-msg"></div>
+      </div>
+      <div class="field">
+        <label><span data-t="labelPhone"></span></label>
+        <input type="tel" id="inp-phone" autocomplete="tel" inputmode="tel">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">💬 <span data-t="sectionSession"></span></div>
+      <div class="field" id="f-problem">
+        <label><span data-t="labelProblem"></span></label>
+        <textarea id="inp-problem"></textarea>
+        <div class="err-msg" data-t="errRequired"></div>
+      </div>
+      <input type="hidden" id="inp-type" value="individual">
+    </div>
+
+    <div class="card">
+      <div class="card-title">📅 <span data-t="sectionDateTime"></span></div>
+
+      <div class="cal-nav">
+        <button class="cal-nav-btn" onclick="calMove(-1)">&#8249;</button>
+        <span class="cal-month" id="cal-month-lbl"></span>
+        <button class="cal-nav-btn" onclick="calMove(1)">&#8250;</button>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+
+      <div id="slots-section">
+        <span class="slots-label" data-t="labelTime"></span>
+        <div id="slots-container"></div>
+      </div>
+    </div>
+
+    <div id="policy-link-wrap" style="margin-bottom:10px; font-size:13px;">
+      <a id="policy-link" href="" target="_blank" rel="noopener"
+         style="color:var(--accent); text-decoration:underline;" id="policy-link"></a>
+    </div>
+
+    <div class="gdpr-box" id="gdpr-box">
+      <input type="checkbox" id="inp-gdpr">
+      <label for="inp-gdpr" id="gdpr-label"></label>
+    </div>
+    <div class="gdpr-err" id="gdpr-err"></div>
+
+    <button class="btn btn-primary" onclick="submitForm()" id="btn-submit">
+      <span data-t="btnContinue"></span>
+    </button>
+    <div style="height:32px"></div>
+  </div>
+
+  <!-- ── SCREEN 2: Payment summary ── -->
+  <div class="screen" id="screen-payment">
+    <div class="card">
+      <div class="card-title">💳 <span data-t="sectionPayment"></span></div>
+      <div id="pay-summary"></div>
+      <div style="height:14px"></div>
+      <div class="price-box">
+        <span class="price-lbl" data-t="labelPrice"></span>
+        <span class="price-amt" id="price-display"></span>
+      </div>
+      <div class="notice" data-t="paymentNotice"></div>
+      <button class="btn btn-primary" id="btn-pay" onclick="goToStripe()">
+        <span data-t="btnPay"></span>
+      </button>
+      <button class="btn btn-secondary" onclick="showScreen('form')" data-t="btnBack"></button>
+    </div>
+  </div>
+
+  <!-- ── SCREEN 3: Confirmation ── -->
+  <div class="screen" id="screen-confirm">
+    <div class="card">
+      <div class="confirm-wrap">
+        <div class="confirm-icon">✅</div>
+        <div class="confirm-title" data-t="confirmTitle"></div>
+        <div class="confirm-sub" id="confirm-sub"></div>
+        <div id="confirm-summary" style="text-align:left"></div>
+        <div id="meet-box" style="display:none; margin:16px 0; background:var(--accent-light); border-radius:10px; padding:14px 16px; text-align:left;">
+          <div style="font-size:13px; color:var(--muted); margin-bottom:6px;" id="meet-label"></div>
+          <a id="meet-link-btn" target="_blank" rel="noopener"
+             style="display:inline-block; background:var(--accent); color:#fff; padding:10px 18px; border-radius:8px; font-size:14px; font-weight:600; text-decoration:none; word-break:break-all;">
+            🎥 <span id="meet-link-text"></span>
+          </a>
+        </div>
+        <a id="btn-add-cal" class="btn-cal" target="_blank" rel="noopener">
+          📅 <span data-t="btnAddCal"></span>
+        </a>
+        <button class="btn btn-secondary" onclick="location.href=location.pathname" data-t="btnBookAnother"></button>
+        <a class="btn-cal" id="btn-back-site" style="margin-top:8px;">
+          🏠 <span data-t="btnBackSite"></span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+// ╔══════════════════════════════════════════════════════════╗
+// ║  CONFIG — edit here; do not touch the code below        ║
+// ╚══════════════════════════════════════════════════════════╝
+const CONFIG = {
+  // Therapist identity
+  therapistName:     "Psycholog Alina Szaputko",
+  therapistPhotoUrl: "",           // URL to a photo, or "" to show emoji
+  therapistEmoji:    "🌿",
+
+  welcomeText: {
+    pl: "Zapraszam na sesję online. Umów się w kilka minut.",
+    ru: "Приглашаю тебя на онлайн-сессию. Запишись за несколько минут.",
+  },
+
+  // Your website URL — shown as "back to website" button on confirmation screen
+  websiteUrl: { pl: "https://psychologwroclaw.org/pol/", ru: "https://psychologwroclaw.org/" },
+
+  // Session settings
+  sessionDurationMinutes: 60,
+  timeZone:               "Europe/Warsaw",
+  sessionPrice:           160,
+  currency:               "PLN",
+
+  // Minimum hours in advance a client must book
+  minBookingHours: 24,
+  maxBookingDays:  14, // clients can only book within the next 2 weeks
+
+  // Working hours (24-h format) and days (0=Sun, 1=Mon … 6=Sat)
+  workingDays:  [1, 2, 3, 4, 5], // Mon–Fri only, weekends disabled
+  workingHours: { start: "09:00", end: "17:00" },
+
+  // Cancellation & booking policy page links (shown on the booking form)
+  // Set to "" to hide the link
+  policyUrl: {
+    pl: "https://psychologwroclaw.org/zasady/",  // ← replace with your actual URL
+    ru: "https://psychologwroclaw.org/pravila/",   // ← replace with your actual URL
+  },
+
+  // Your Vercel deployment URL (origin only; no /api path). Calendar availability is read server-side.
+  // Example: "https://psychology-booking-api.vercel.app"
+  apiBaseUrl: "https://booking-backend-git-stripe-test-alinaszaputko-psychs-projects.vercel.app",
+
+  defaultLanguage: "pl",
+};
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  TRANSLATIONS — all UI strings, no hardcoded text       ║
+// ╚══════════════════════════════════════════════════════════╝
+const T = {
+  pl: {
+    pageTitle:       "Rezerwacja sesji",
+    sectionPersonal: "Twoje dane",
+    sectionSession:  "O sesji",
+    sectionDateTime: "Wybierz termin",
+    sectionPayment:  "Podsumowanie i płatność",
+
+    labelName:        "Imię i nazwisko",
+    labelEmail:       "Adres e-mail",
+    labelPhone:       "Numer telefonu (opcjonalnie)",
+    labelProblem:     "Jeśli chcesz, opisz krótko cel spotkania (opcjonalnie; odpowiedź nie jest zapisywana w systemie rezerwacji).",
+    labelSessionType: "Rodzaj sesji (opcjonalnie)",
+    labelTime:        "Wybierz godzinę",
+    labelPrice:       "Do zapłaty",
+
+    typeDefault:    "— wybierz —",
+    typeFirst:      "Konsultacja indywidualna",
+  
+    errRequired: "To pole jest wymagane.",
+    errEmail:    "Podaj prawidłowy adres e-mail.",
+
+    btnContinue:   "Przejdź do płatności →",
+    btnPay:        "Zapłać bezpiecznie online",
+    btnBack:       "← Wróć do formularza",
+    btnAddCal:     "Dodaj do Kalendarza Google",
+    btnBookAnother: "Zarezerwuj kolejną sesję",
+    btnBackSite:    "Wróć na stronę główną",
+
+    paymentNotice:  "Zostaniesz przekierowany/a na bezpieczną stronę płatności Stripe.",
+    confirmTitle:   "Dziękuję za rezerwację!",
+    confirmSubMsg:  "Potwierdzenie zostało wysłane na Twój adres e-mail.",
+    paymentProcessing: "Płatność została przekazana do weryfikacji. Potwierdzenie rezerwacji pojawi się tutaj po utworzeniu wydarzenia w kalendarzu.",
+    paymentCalendarCreated: "Rezerwacja jest już w kalendarzu. Kończę wysyłanie wiadomości e-mail.",
+    paymentConfirmed: "rezerwacja jest potwierdzona. Wysłaliśmy wiadomość e-mail.",
+    paymentRefunded: "Termin stał się niedostępny po płatności. Zwrot płatności został zainicjowany. Skontaktujemy się z Tobą, jeśli będzie to konieczne.",
+    paymentStatusError: "Nie możemy teraz sprawdzić statusu rezerwacji. Nie dokonuj ponownej płatności; skontaktuj się z psychologiem, podając potwierdzenie płatności.",
+    paymentInitError: "Nie udało się rozpocząć płatności. Spróbuj ponownie.",
+    paymentSlotUnavailable: "Ten termin nie jest już dostępny. Wybierz inny termin.",
+
+    summaryDate:     "Data",
+    summaryTime:     "Godzina",
+    summaryType:     "Rodzaj sesji",
+    summaryDuration: "Czas trwania",
+    summaryMinutes:  "minut",
+
+    slotsLoading: "Sprawdzam dostępność…",
+    slotsNone:    "Brak wolnych terminów tego dnia. Wybierz inny dzień.",
+    slotsAvailabilityError: "Nie udało się sprawdzić dostępności. Odśwież stronę lub spróbuj ponownie za chwilę.",
+
+    authRequired:  "Aby dokończyć rezerwację, zaloguj się do Google (wymagane do utworzenia wydarzenia w kalendarzu).",
+    authBtn:       "Zaloguj się przez Google →",
+    creatingEvent: "Tworzę wydarzenie w kalendarzu…",
+    confirmSubMsg: "Wydarzenie zostało dodane do Twojego kalendarza Google wraz z linkiem do sesji.",
+
+    gdprText: "Wyrażam zgodę na przetwarzanie moich danych osobowych przez Alinę Szaputko w celu obsługi rezerwacji, płatności i organizacji sesji. Dane niezbędne do tych celów mogą być przekazywane dostawcom usług technicznych, płatniczych i kalendarzowych zgodnie z polityką prywatności. Pole dotyczące celu sesji jest opcjonalne, a jego treść nie jest wysyłana do systemu rezerwacji. Zgodę mogę wycofać, pisząc na adres: gorbachovaalina@gmail.com. Treść zgody i politykę prywatności należy zweryfikować przed uruchomieniem produkcyjnym.",
+    gdprErr:  "Prosimy o wyrażenie zgody na przetwarzanie danych, aby kontynuować.",
+    policyLinkText: "Zapoznaj się z zasadami rezerwacji i anulowania wizyt →",
+    instagramNotice:       "Nie widzisz odpowiedniego terminu lub masz pytania? Napisz do mnie na Instagramie: ",
+    instagramNoticeSuffix: " — chętnie pomogę znaleźć odpowiedni czas.",
+    meetLabel: "Twój unikalny link do sesji online (Google Meet):",
+    meetLinkText: "Dołącz do sesji",
+
+    monthNames: ["Styczeń","Luty","Marzec","Kwiecień","Maj","Czerwiec",
+                 "Lipiec","Sierpień","Wrzesień","Październik","Listopad","Grudzień"],
+    dayNamesShort: ["Nd","Pn","Wt","Śr","Cz","Pt","Sb"],
+    dayNamesFull:  ["Niedziela","Poniedziałek","Wtorek","Środa","Czwartek","Piątek","Sobota"],
+  },
+
+  ru: {
+    pageTitle:       "Запись на сессию",
+    sectionPersonal: "Твои данные",
+    sectionSession:  "О сессии",
+    sectionDateTime: "Выбери дату и время",
+    sectionPayment:  "Сводка и оплата",
+
+    labelName:        "Имя и фамилия",
+    labelEmail:       "Электронная почта",
+    labelPhone:       "Номер телефона (необязательно)",
+    labelProblem:     "Если хочешь, кратко опиши цель встречи (необязательно; ответ не сохраняется в системе записи).",
+    labelSessionType: "Тип сессии (необязательно)",
+    labelTime:        "Выбери время",
+    labelPrice:       "К оплате",
+
+    typeDefault:    "— выбери —",
+    typeFirst:      "Индивидуальная консультация",
+   
+    errRequired: "Это поле обязательно.",
+    errEmail:    "Введи корректный адрес электронной почты.",
+
+    btnContinue:    "Перейти к оплате →",
+    btnPay:         "Оплатить безопасно онлайн",
+    btnBack:        "← Вернуться к форме",
+    btnAddCal:      "Добавить в Google Календарь",
+    btnBookAnother: "Записаться ещё раз",
+    btnBackSite:    "Вернуться на сайт",
+
+    paymentNotice:  "Сейчас тебя перенаправит на защищённую страницу оплаты Stripe.",
+    confirmTitle:   "Спасибо за запись!",
+    confirmSubMsg:  "Подтверждение отправлено на твою электронную почту.",
+    paymentProcessing: "Платёж проверяется. Подтверждение записи появится здесь после создания события в календаре.",
+    paymentCalendarCreated: "Запись уже добавлена в календарь. Завершается отправка электронных писем.",
+    paymentConfirmed: "запись подтверждена. Мы отправили письмо на электронную почту.",
+    paymentRefunded: "После оплаты выбранное время стало недоступным. Возврат средств инициирован. При необходимости мы свяжемся с вами.",
+    paymentStatusError: "Сейчас не удаётся проверить статус записи. Не оплачивайте повторно; свяжитесь с психологом и укажите подтверждение оплаты.",
+    paymentInitError: "Не удалось начать оплату. Попробуйте ещё раз.",
+    paymentSlotUnavailable: "Это время больше недоступно. Выберите другое время.",
+
+    summaryDate:     "Дата",
+    summaryTime:     "Время",
+    summaryType:     "Тип сессии",
+    summaryDuration: "Продолжительность",
+    summaryMinutes:  "минут",
+
+    slotsLoading: "Проверяю доступность…",
+    slotsNone:    "Нет свободных слотов на этот день. Выбери другой день.",
+    slotsAvailabilityError: "Не удалось проверить доступность. Обнови страницу или попробуй позже.",
+
+    authRequired:  "Чтобы завершить запись, войдите через Google (необходимо для создания события в календаре).",
+    authBtn:       "Войти через Google →",
+    creatingEvent: "Создаю событие в календаре…",
+    confirmSubMsg: "Событие добавлено в твой Google Календарь вместе со ссылкой на сессию.",
+
+    gdprText: "Я даю согласие на обработку моих персональных данных Алиной Шапутько для обработки записи, оплаты и организации сессии. Необходимые для этих целей данные могут передаваться поставщикам технических, платёжных и календарных услуг в соответствии с политикой конфиденциальности. Поле о цели сессии необязательное, и его содержание не отправляется в систему записи. Согласие можно отозвать, написав на адрес: gorbachovaalina@gmail.com. Перед запуском необходимо проверить формулировку согласия и политику конфиденциальности.",
+    gdprErr:  "Пожалуйста, дайте согласие на обработку данных, чтобы продолжить.",
+    policyLinkText: "Ознакомьтесь с правилами записи и отмены сессий →",
+    instagramNotice:       "Не видишь подходящего окошка или есть вопросы? Напиши мне в Инстаграм: ",
+    instagramNoticeSuffix: " — с удовольствием помогу подобрать удобное время.",
+    meetLabel: "Твоя уникальная ссылка для онлайн-сессии:",
+    meetLinkText: "Присоединиться к сессии",
+
+    monthNames: ["Январь","Февраль","Март","Апрель","Май","Июнь",
+                 "Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"],
+    dayNamesShort: ["Вс","Пн","Вт","Ср","Чт","Пт","Сб"],
+    dayNamesFull:  ["Воскресенье","Понедельник","Вторник","Среда","Четверг","Пятница","Суббота"],
+  },
+};
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  APP STATE                                              ║
+// ╚══════════════════════════════════════════════════════════╝
+let lang = CONFIG.defaultLanguage;
+let calYear, calMonth;
+let selectedDate = null;
+let selectedTime = null;
+let busyCache    = {};
+let availabilityLoadedMonths = new Set();
+let pendingBooking = null;
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  LANGUAGE                                               ║
+// ╚══════════════════════════════════════════════════════════╝
+function detectLang() {
+  const stored = localStorage.getItem('bk_lang');
+  if (stored && T[stored]) return stored;
+  const navLangs = (navigator.languages || [navigator.language || 'pl']);
+  for (const l of navLangs) {
+    if (l.toLowerCase().startsWith('ru')) return 'ru';
+  }
+  return 'pl';
+}
+
+function setLang(l) {
+  if (!T[l]) return;
+  lang = l;
+  localStorage.setItem('bk_lang', l);
+  document.documentElement.lang = l;
+  document.getElementById('btn-pl').classList.toggle('active', l === 'pl');
+  document.getElementById('btn-ru').classList.toggle('active', l === 'ru');
+  applyTranslations();
+  renderCalendar();
+  if (selectedDate) renderSlots(selectedDate);
+}
+
+function tr(key) {
+  return (T[lang] && T[lang][key] != null) ? T[lang][key] : (T.pl[key] || key);
+}
+
+function applyTranslations() {
+  document.title = tr('pageTitle');
+
+  document.getElementById('therapist-name').textContent    = CONFIG.therapistName;
+  document.getElementById('therapist-welcome').textContent = CONFIG.welcomeText[lang] || CONFIG.welcomeText.pl;
+
+  // Elements with data-t attribute
+  document.querySelectorAll('[data-t]').forEach(el => {
+    el.textContent = tr(el.getAttribute('data-t'));
+  });
+
+  // Placeholders
+  setPlaceholder('inp-name',    tr('labelName'));
+  setPlaceholder('inp-email',   tr('labelEmail'));
+  setPlaceholder('inp-phone',   tr('labelPhone'));
+  setPlaceholder('inp-problem', tr('labelProblem'));
+
+  // GDPR label (plain text, no HTML)
+  const gdprLabel = document.getElementById('gdpr-label');
+  if (gdprLabel) gdprLabel.textContent = tr('gdprText');
+  const gdprErr = document.getElementById('gdpr-err');
+  if (gdprErr) gdprErr.textContent = tr('gdprErr');
+
+  // Policy link
+  const policyUrl  = CONFIG.policyUrl[lang] || '';
+  const policyWrap = document.getElementById('policy-link-wrap');
+  const policyLink = document.getElementById('policy-link');
+  if (policyWrap && policyLink) {
+    if (policyUrl) {
+      policyWrap.style.display = 'block';
+      policyLink.href          = policyUrl;
+      policyLink.textContent   = tr('policyLinkText');
+    } else {
+      policyWrap.style.display = 'none';
+    }
+  }
+
+  // Instagram notice
+  const noticeText   = document.getElementById('instagram-notice-text');
+  const noticeSuffix = document.getElementById('instagram-notice-suffix');
+  if (noticeText)   noticeText.textContent   = tr('instagramNotice');
+  if (noticeSuffix) noticeSuffix.textContent = tr('instagramNoticeSuffix');
+}
+
+function setPlaceholder(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.placeholder = text;
+}
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  GOOGLE CALENDAR — read availability (server-side API)  ║
+// ╚══════════════════════════════════════════════════════════╝
+// Calendar availability is read through the backend. The browser receives only busy time
+// ranges (never event titles, descriptions, attendee details or the private Calendar ID).
+async function prefetchMonth(year, month) {
+  const monthKey = `${year}-${pad(month + 1)}`;
+  if (availabilityLoadedMonths.has(monthKey)) return;
+
+  try {
+    const response = await fetch(`${CONFIG.apiBaseUrl}/api/availability?month=${monthKey}`, { cache: 'no-store' });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !Array.isArray(data.busyRanges)) throw new Error(data.message || 'Availability could not be loaded');
+
+    const ranges = data.busyRanges
+      .map(item => ({ start: Number(item.startWallMs), end: Number(item.endWallMs) }))
+      .filter(item => Number.isFinite(item.start) && Number.isFinite(item.end) && item.end > item.start);
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(year, month, d);
+      const key = fmtDate(date);
+      const dayStart = Date.UTC(year, month, d, 0, 0, 0, 0);
+      const dayEnd = Date.UTC(year, month, d + 1, 0, 0, 0, 0);
+      busyCache[key] = ranges.filter(range => range.start < dayEnd && range.end > dayStart);
+    }
+    availabilityLoadedMonths.add(monthKey);
+  } catch (error) {
+    console.warn('Calendar availability could not be loaded:', error);
+  }
+}
+
+async function fetchBusySlots(dateStr) {
+  if (busyCache[dateStr] !== undefined) return busyCache[dateStr];
+  const [year, month] = dateStr.split('-').map(Number);
+  await prefetchMonth(year, month - 1);
+  if (busyCache[dateStr] !== undefined) return busyCache[dateStr];
+  throw new Error('Availability unavailable');
+}
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  CALENDAR                                               ║
+// ╚══════════════════════════════════════════════════════════╝
+function initCalendar() {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: CONFIG.timeZone, year: 'numeric', month: '2-digit',
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  calYear = Number(values.year);
+  calMonth = Number(values.month) - 1;
+  renderCalendar();
+}
+
+function calMove(dir) {
+  calMonth += dir;
+  if (calMonth > 11) { calMonth = 0;  calYear++; }
+  if (calMonth < 0)  { calMonth = 11; calYear--; }
+  // Prefetch busy slots for new month, then render
+  prefetchMonth(calYear, calMonth).then(() => renderCalendar());
+}
+
+function renderCalendar() {
+  const months = tr('monthNames');
+  const days   = tr('dayNamesShort'); // indexed 0=Sun
+
+  document.getElementById('cal-month-lbl').textContent =
+    `${months[calMonth]} ${calYear}`;
+
+  const grid = document.getElementById('cal-grid');
+  grid.innerHTML = '';
+
+  // Headers: Mon → Sun (ISO week)
+  const weekOrder = [1,2,3,4,5,6,0];
+  weekOrder.forEach(d => {
+    const h = document.createElement('div');
+    h.className = 'cal-hdr';
+    h.textContent = days[d];
+    grid.appendChild(h);
+  });
+
+  const now = new Date();
+  const todayParts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: CONFIG.timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(now);
+  const todayValues = Object.fromEntries(todayParts.map(part => [part.type, part.value]));
+  const todayStr = `${todayValues.year}-${todayValues.month}-${todayValues.day}`;
+  const today = new Date(`${todayStr}T00:00:00`);
+
+  const firstDay   = new Date(calYear, calMonth, 1);
+  const daysInMon  = new Date(calYear, calMonth + 1, 0).getDate();
+  const prevDays   = new Date(calYear, calMonth, 0).getDate();
+
+  // Offset (Mon=0 … Sun=6)
+  let offset = firstDay.getDay() - 1;
+  if (offset < 0) offset = 6;
+
+  // Prev-month filler cells
+  for (let i = 0; i < offset; i++) {
+    const el = document.createElement('div');
+    el.className = 'cal-day other';
+    el.textContent = prevDays - offset + i + 1;
+    grid.appendChild(el);
+  }
+
+  // Current month days
+  for (let d = 1; d <= daysInMon; d++) {
+    const date    = new Date(calYear, calMonth, d);
+    const dateStr = fmtDate(date);
+    const el      = document.createElement('div');
+    el.className  = 'cal-day';
+    el.textContent = d;
+
+    const isToday   = dateStr === todayStr;
+    const isPast    = dateStr < todayStr;
+    const isWorking = CONFIG.workingDays.includes(date.getDay());
+    const allSlotsForDay = generateSlots();
+    const firstSlotStart = allSlotsForDay.length ? wallTimeToUtcMs(dateStr, allSlotsForDay[0]) : NaN;
+    const lastSlotStart  = allSlotsForDay.length ? wallTimeToUtcMs(dateStr, allSlotsForDay[allSlotsForDay.length - 1]) : NaN;
+    const isTooSoon = !Number.isFinite(lastSlotStart) || (lastSlotStart - now.getTime()) < CONFIG.minBookingHours * 3600000;
+    const isTooFar  = !Number.isFinite(firstSlotStart) || (firstSlotStart - now.getTime()) > CONFIG.maxBookingDays * 86400000;
+
+    if (isToday) el.classList.add('today');
+
+    if (isPast || !isWorking || isTooSoon || isTooFar) {
+      el.classList.add('dis');
+      if (isTooFar) el.classList.add('too-far');
+    } else {
+      if (selectedDate && fmtDate(selectedDate) === dateStr) el.classList.add('sel');
+      el.addEventListener('click', () => onDateClick(date));
+    }
+    grid.appendChild(el);
+  }
+
+  // Fill trailing cells to complete last row
+  const total = offset + daysInMon;
+  const trailing = total % 7 === 0 ? 0 : 7 - (total % 7);
+  for (let i = 1; i <= trailing; i++) {
+    const el = document.createElement('div');
+    el.className = 'cal-day other';
+    el.textContent = i;
+    grid.appendChild(el);
+  }
+
+  // After rendering, asynchronously grey out fully-booked days
+  disableFullyBookedDays(calYear, calMonth, daysInMon, today, grid);
+}
+
+function disableFullyBookedDays(year, month, daysInMon, today, grid) {
+  // Only disable days from a month whose busy ranges were loaded successfully.
+  const monthKey = `${year}-${pad(month + 1)}`;
+  if (!availabilityLoadedMonths.has(monthKey)) return;
+  const allSlots = generateSlots();
+  if (!allSlots.length) return;
+
+  const dayCells = Array.from(grid.querySelectorAll('.cal-day:not(.other):not(.dis)'));
+  for (const el of dayCells) {
+    const d       = parseInt(el.textContent);
+    const pad     = n => String(n).padStart(2, '0');
+    const dateStr = `${year}-${pad(month + 1)}-${pad(d)}`;
+    const busy    = busyCache[dateStr] || [];
+    const allTaken = allSlots.every(s => isSlotTaken(dateStr, s, busy));
+    if (allTaken) {
+      const clone = el.cloneNode(true);
+      clone.classList.add('dis', 'fully-booked');
+      el.replaceWith(clone);
+    }
+  }
+}
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  TIME SLOTS                                             ║
+// ╚══════════════════════════════════════════════════════════╝
+async function onDateClick(date) {
+  selectedDate = date;
+  selectedTime = null;
+  renderCalendar();
+
+  const section   = document.getElementById('slots-section');
+  const container = document.getElementById('slots-container');
+  section.style.display = 'block';
+  container.classList.remove('slots-err');
+  container.innerHTML = `<div class="slots-msg">${tr('slotsLoading')}</div>`;
+
+  const dateStr = fmtDate(date);
+  try {
+    const taken = await fetchBusySlots(dateStr);
+    renderSlots(date, taken);
+  } catch (error) {
+    console.warn('Selected date availability unavailable:', error);
+    container.innerHTML = `<div class="slots-msg">${tr('slotsAvailabilityError')}</div>`;
+  }
+}
+
+function isSlotTaken(dateStr, slotTime, busyRanges) {
+  const slotStart = wallTimeToUtcMs(dateStr, slotTime);
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const [hour, minute] = slotTime.split(':').map(Number);
+  const slotWallStart = Date.UTC(year, month - 1, day, hour, minute);
+  const slotWallEnd = slotWallStart + CONFIG.sessionDurationMinutes * 60000;
+  const fromNow   = slotStart - Date.now();
+
+  // Block slots less than minBookingHours away
+  if (fromNow < CONFIG.minBookingHours * 3600000) return true;
+  // Block slots beyond maxBookingDays
+  if (fromNow > CONFIG.maxBookingDays * 86400000) return true;
+
+  if (!busyRanges || !busyRanges.length) return false;
+  return busyRanges.some(r => slotWallStart < r.end && slotWallEnd > r.start);
+}
+
+function renderSlots(date, takenOverride) {
+  const container = document.getElementById('slots-container');
+  const dateStr   = fmtDate(date);
+  const busyRanges = takenOverride !== undefined ? takenOverride : (busyCache[dateStr] || []);
+  const allSlots  = generateSlots();
+
+  if (!allSlots.length) {
+    container.innerHTML = `<div class="slots-msg">${tr('slotsNone')}</div>`;
+    return;
+  }
+
+  const freeSlots = allSlots.filter(s => !isSlotTaken(dateStr, s, busyRanges));
+  if (!freeSlots.length) {
+    container.innerHTML = `<div class="slots-msg">${tr('slotsNone')}</div>`;
+    return;
+  }
+
+  const grid = document.createElement('div');
+  grid.className = 'slots-grid';
+
+  allSlots.forEach(time => {
+    const btn = document.createElement('button');
+    btn.className = 'slot';
+    btn.textContent = time;
+    if (isSlotTaken(dateStr, time, busyRanges)) {
+      btn.classList.add('taken');
+      btn.disabled = true;
+    } else {
+      btn.addEventListener('click', () => {
+        selectedTime = time;
+        document.querySelectorAll('.slot').forEach(b => b.classList.remove('sel'));
+        btn.classList.add('sel');
+      });
+      if (selectedTime === time) btn.classList.add('sel');
+    }
+    grid.appendChild(btn);
+  });
+
+  container.innerHTML = '';
+  container.appendChild(grid);
+}
+
+function generateSlots() {
+  const [sh, sm] = CONFIG.workingHours.start.split(':').map(Number);
+  const [eh, em] = CONFIG.workingHours.end.split(':').map(Number);
+  const slots = [];
+  let cur = sh * 60 + sm;
+  const end = eh * 60 + em;
+  while (cur + CONFIG.sessionDurationMinutes <= end) {
+    slots.push(`${pad(Math.floor(cur/60))}:${pad(cur%60)}`);
+    cur += CONFIG.sessionDurationMinutes;
+  }
+  return slots;
+}
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  FORM VALIDATION & SUBMIT                               ║
+// ╚══════════════════════════════════════════════════════════╝
+function setFieldErr(fieldId, errKey) {
+  const field = document.getElementById(fieldId);
+  field.classList.add('has-err');
+  const msg = field.querySelector('.err-msg');
+  if (msg) msg.textContent = tr(errKey);
+}
+function clearFieldErr(fieldId) {
+  document.getElementById(fieldId).classList.remove('has-err');
+}
+
+function submitForm() {
+  let ok = true;
+
+  const name    = document.getElementById('inp-name').value.trim();
+  const email   = document.getElementById('inp-email').value.trim();
+  const phone   = document.getElementById('inp-phone').value.trim();
+  const stype   = document.getElementById('inp-type').value;
+
+  if (!name)  { setFieldErr('f-name', 'errRequired');   ok = false; }
+  else          clearFieldErr('f-name');
+
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  if (!emailOk) {
+    setFieldErr('f-email', 'errEmail');
+    document.getElementById('email-err-msg').textContent = tr('errEmail');
+    ok = false;
+  } else clearFieldErr('f-email');
+
+  clearFieldErr('f-problem');
+
+  const grid = document.getElementById('cal-grid');
+  if (!selectedDate) {
+    grid.classList.add('cal-err');
+    setTimeout(() => grid.classList.remove('cal-err'), 2000);
+    ok = false;
+  }
+
+  const slotWrap = document.getElementById('slots-container');
+  if (!selectedTime) {
+    slotWrap.classList.add('slots-err');
+    setTimeout(() => slotWrap.classList.remove('slots-err'), 2000);
+    ok = false;
+  }
+
+  // GDPR consent check
+  const gdprBox = document.getElementById('gdpr-box');
+  if (!document.getElementById('inp-gdpr').checked) {
+    gdprBox.classList.add('has-err');
+    setTimeout(() => gdprBox.classList.remove('has-err'), 3000);
+    ok = false;
+  } else {
+    gdprBox.classList.remove('has-err');
+  }
+
+  if (!ok) return;
+
+  // Build and persist booking
+  const b = {
+    name, email, phone,
+    sessionType:  stype,
+    date:         fmtDate(selectedDate),
+    dateFriendly: fmtDateFriendly(selectedDate),
+    time:         selectedTime,
+    price:        CONFIG.sessionPrice,
+    currency:     CONFIG.currency,
+    lang,
+    ts:           Date.now(),
+    requestId:    (window.crypto && typeof window.crypto.randomUUID === 'function')
+      ? window.crypto.randomUUID() : `bkreq_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`,
+  };
+
+  // Do not create a reservation yet. The server reserves the slot atomically when the
+  // client clicks Pay and creates the Stripe Checkout Session.
+  pendingBooking = b;
+  showPaymentScreen(b);
+}
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  PAYMENT SCREEN                                         ║
+// ╚══════════════════════════════════════════════════════════╝
+function showPaymentScreen(b) {
+  document.getElementById('price-display').textContent =
+    `${b.price} ${b.currency}`;
+
+  const typeLbl = typeLabel(b.sessionType);
+  const rows = [
+    [tr('summaryDate'),     b.dateFriendly],
+    [tr('summaryTime'),     b.time],
+    ...(typeLbl ? [[tr('summaryType'), typeLbl]] : []),
+    [tr('summaryDuration'), `${CONFIG.sessionDurationMinutes} ${tr('summaryMinutes')}`],
+  ];
+
+  document.getElementById('pay-summary').innerHTML =
+    rows.map(([l, v]) =>
+      `<div class="summary-row"><span class="lbl">${l}</span><span class="val">${v}</span></div>`
+    ).join('');
+
+  showScreen('payment');
+}
+
+async function goToStripe() {
+  const btn = document.getElementById('btn-pay');
+  if (!pendingBooking) return;
+  btn.innerHTML = `<span class="spinner"></span>${tr('btnPay')}`;
+  btn.disabled = true;
+
+  try {
+    const response = await fetch(`${CONFIG.apiBaseUrl}/api/create-checkout-session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: pendingBooking.name,
+        email: pendingBooking.email,
+        phone: pendingBooking.phone || '',
+        date: pendingBooking.date,
+        time: pendingBooking.time,
+        lang: pendingBooking.lang,
+        duration: CONFIG.sessionDurationMinutes,
+        gdprConsent: document.getElementById('inp-gdpr').checked,
+        requestId: pendingBooking.requestId,
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.url) {
+      const key = data.error === 'SLOT_UNAVAILABLE' ? 'paymentSlotUnavailable' : 'paymentInitError';
+      throw new Error(tr(key));
+    }
+    window.location.assign(data.url);
+  } catch (error) {
+    console.error('Could not create Stripe Checkout Session:', error);
+    btn.disabled = false;
+    btn.textContent = tr('btnPay');
+    alert(error.message || tr('paymentInitError'));
+  }
+}
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  CONFIRMATION SCREEN                                    ║
+// ╚══════════════════════════════════════════════════════════╝
+async function showConfirmScreen(sessionId) {
+  const initialTitle = document.querySelector('[data-t="confirmTitle"]');
+  if (initialTitle) initialTitle.textContent = tr('confirmTitle');
+  document.getElementById('confirm-sub').textContent = tr('paymentProcessing');
+  document.getElementById('confirm-summary').innerHTML = '';
+  showScreen('confirm');
+
+  if (!sessionId || !CONFIG.apiBaseUrl) {
+  document.getElementById('confirm-sub').textContent = tr('paymentStatusError');
+  return;
+}
+
+  // Poll status for up to ~45 seconds. The webhook, not this page, creates the event.
+  let renderedCalendarEvent = false;
+  for (let attempt = 0; attempt < 18; attempt++) {
+    try {
+      const url = `${CONFIG.apiBaseUrl}/api/booking-status?session_id=${encodeURIComponent(sessionId)}`;
+      const response = await fetch(url, { method: 'GET' });
+      const data = await response.json().catch(() => ({}));
+
+      if (response.ok && data.paid && data.booking) {
+        if (data.status === 'refunded_calendar_conflict') {
+          document.getElementById('confirm-sub').textContent = tr('paymentRefunded');
+          return;
+        }
+        const booking = data.booking;
+        if ((data.status === 'calendar_created' || data.status === 'completed') && !renderedCalendarEvent) {
+          if (booking.lang && T[booking.lang]) { lang = booking.lang; setLang(lang); }
+          renderConfirmUI(booking);
+          if (data.meetLink || data.eventLink) showMeetLink(data.meetLink, data.eventLink);
+          renderedCalendarEvent = true;
+        }
+        if (data.status === 'completed') {
+          document.getElementById('confirm-sub').textContent = `${booking.name} — ${tr('paymentConfirmed')}`;
+          return;
+        }
+        if (data.status === 'calendar_created') {
+          document.getElementById('confirm-sub').textContent = tr('paymentCalendarCreated');
+        }
+      }
+    } catch (error) {
+      console.warn('Payment status check failed; will retry:', error);
+    }
+    await new Promise(resolve => setTimeout(resolve, 2500));
+  }
+  if (!renderedCalendarEvent) document.getElementById('confirm-sub').textContent = tr('paymentProcessing');
+  else document.getElementById('confirm-sub').textContent = tr('paymentCalendarCreated');
+}
+
+function renderConfirmUI(b) {
+  document.getElementById('confirm-sub').textContent =
+    `${b.name} — ${tr('confirmSubMsg')}`;
+
+  const rows = [
+    [tr('summaryDate'),     b.dateFriendly || b.date],
+    [tr('summaryTime'),     b.time],
+    [tr('summaryDuration'), `${CONFIG.sessionDurationMinutes} ${tr('summaryMinutes')}`],
+  ];
+  document.getElementById('confirm-summary').innerHTML =
+    rows.map(([l, v]) =>
+      `<div class="summary-row"><span class="lbl">${l}</span><span class="val">${v}</span></div>`
+    ).join('');
+
+  const backBtn = document.getElementById('btn-back-site');
+  if (backBtn) backBtn.href = CONFIG.websiteUrl[b.lang] || CONFIG.websiteUrl.pl;
+
+  // Hide meet box until we get the link from Calendar API
+  const meetBox = document.getElementById('meet-box');
+  if (meetBox) meetBox.style.display = 'none';
+
+  // Hide add-to-cal button until event is created
+  const calBtn = document.getElementById('btn-add-cal');
+  if (calBtn) calBtn.style.display = 'none';
+}
+
+function showMeetLink(meetLink, eventLink) {
+  const meetBox = document.getElementById('meet-box');
+  if (!meetBox) return;
+
+  if (meetLink) {
+    meetBox.style.display = 'block';
+    meetBox.innerHTML = `
+      <div style="font-size:13px;color:var(--muted);margin-bottom:8px;">${tr('meetLabel')}</div>
+      <a href="${meetLink}" target="_blank" rel="noopener"
+         style="display:inline-block;background:var(--accent);color:#fff;padding:10px 18px;
+                border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;">
+        🎥 ${tr('meetLinkText')}
+      </a>`;
+  } else {
+    meetBox.style.display = 'none';
+  }
+
+  // Show the calendar event link if we have it
+  const calBtn = document.getElementById('btn-add-cal');
+  if (calBtn && eventLink) {
+    calBtn.href = eventLink;
+    calBtn.style.display = 'flex';
+  } else if (calBtn) {
+    calBtn.style.display = 'none';
+  }
+}
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  SCREEN ROUTING                                         ║
+// ╚══════════════════════════════════════════════════════════╝
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(`screen-${name}`).classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function handleUrlParams() {
+  const params = new URLSearchParams(window.location.search);
+  const status = params.get('status');
+  if (status === 'success') {
+    const sessionId = params.get('session_id') || '';
+    // Keep session_id in the URL so a refresh can safely check the same payment again.
+    showConfirmScreen(sessionId);
+    return true;
+  }
+  if (status === 'cancelled') {
+    const bookingId = params.get('booking_id') || '';
+    window.history.replaceState({}, '', window.location.pathname);
+    showScreen('form');
+    if (bookingId) {
+      fetch(`${CONFIG.apiBaseUrl}/api/cancel-booking`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId }),
+      }).catch(error => console.warn('Could not cancel unpaid slot hold:', error));
+    }
+    return true;
+  }
+  return false;
+}
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  HELPERS                                                ║
+// ╚══════════════════════════════════════════════════════════╝
+function pad(n) { return String(n).padStart(2, '0'); }
+
+function wallTimeToUtcMs(dateText, timeText) {
+  const [year, month, day] = dateText.split('-').map(Number);
+  const [hour, minute] = timeText.split(':').map(Number);
+  const target = Date.UTC(year, month - 1, day, hour, minute, 0);
+  let guess = target;
+  for (let i = 0; i < 4; i++) {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: CONFIG.timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    }).formatToParts(new Date(guess));
+    const value = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    const represented = Date.UTC(Number(value.year), Number(value.month) - 1, Number(value.day), Number(value.hour), Number(value.minute));
+    guess += target - represented;
+  }
+  return guess;
+}
+
+function fmtDate(d) {
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+function fmtTime(d) {
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function fmtDateFriendly(d) {
+  return `${tr('dayNamesFull')[d.getDay()]}, ${d.getDate()} ${tr('monthNames')[d.getMonth()]} ${d.getFullYear()}`;
+}
+function typeLabel(key) {
+  // Only individual sessions offered — hide from all summaries
+  return '';
+}
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  INIT                                                   ║
+// ╚══════════════════════════════════════════════════════════╝
+window.addEventListener('load', () => {
+  lang = detectLang();
+  setLang(lang);
+  initCalendar();
+  prefetchMonth(calYear, calMonth).then(() => renderCalendar());
+  if (!handleUrlParams()) showScreen('form');
+});
+</script>
+
+</body>
+</html>
