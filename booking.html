@@ -4,6 +4,36 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rezerwacja sesji</title>
+  <!-- GA4: the booking page lives on GitHub Pages, so it needs its own tag.
+       Analytics consent is denied by default. WordPress passes ga_consent=granted
+       only after its cookie-consent tool confirms statistics consent. -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CV5LW1GYMK"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = window.gtag || function(){ window.dataLayer.push(arguments); };
+    const bookingUrlParams = new URLSearchParams(window.location.search);
+    const bookingGaConsent = bookingUrlParams.get('ga_consent') === 'granted';
+    window.bookingGaConsentGranted = bookingGaConsent;
+    if (bookingUrlParams.has('ga_consent')) {
+      bookingUrlParams.delete('ga_consent');
+      const cleanQuery = bookingUrlParams.toString();
+      window.history.replaceState({}, '', window.location.pathname + (cleanQuery ? `?${cleanQuery}` : '') + window.location.hash);
+    }
+    gtag('consent', 'default', {
+      analytics_storage: 'denied',
+      ad_storage: 'denied',
+      ad_user_data: 'denied',
+      ad_personalization: 'denied'
+    });
+    if (bookingGaConsent) {
+      gtag('consent', 'update', { analytics_storage: 'granted' });
+    }
+    gtag('js', new Date());
+    gtag('config', 'G-CV5LW1GYMK', {
+      send_page_view: bookingGaConsent,
+      linker: { domains: ['psychologwroclaw.org', 'alinaszaputko-psych.github.io'] }
+    });
+  </script>
   <style>
     /* ── Design tokens ── */
     :root {
@@ -742,6 +772,49 @@ let selectedTime = null;
 let busyCache    = {};
 let availabilityLoadedMonths = new Set();
 let pendingBooking = null;
+let bookingStartTracked = false;
+let beginCheckoutTracked = false;
+
+const GA4_MEASUREMENT_ID = 'G-CV5LW1GYMK';
+
+function trackBookingAnalytics(eventName, parameters = {}) {
+  if (!window.bookingGaConsentGranted || typeof window.gtag !== 'function') return;
+  window.gtag('event', eventName, parameters);
+}
+
+function getGa4Field(fieldName) {
+  return new Promise(resolve => {
+    let finished = false;
+    const timeout = window.setTimeout(() => {
+      if (finished) return;
+      finished = true;
+      resolve(null);
+    }, 1200);
+    try {
+      window.gtag('get', GA4_MEASUREMENT_ID, fieldName, value => {
+        if (finished) return;
+        finished = true;
+        window.clearTimeout(timeout);
+        resolve(value == null ? null : String(value));
+      });
+    } catch (error) {
+      window.clearTimeout(timeout);
+      resolve(null);
+    }
+  });
+}
+
+async function getGa4BookingContext() {
+  if (!window.bookingGaConsentGranted || typeof window.gtag !== 'function') return null;
+  const [clientId, sessionId] = await Promise.all([
+    getGa4Field('client_id'),
+    getGa4Field('session_id'),
+  ]);
+  if (!clientId || !/^\d+\.\d+$/.test(clientId) || !sessionId || !/^\d{1,20}$/.test(sessionId) || Number(sessionId) <= 0) {
+    return null;
+  }
+  return { consentGranted: true, clientId, sessionId };
+}
 
 // ╔══════════════════════════════════════════════════════════╗
 // ║  LANGUAGE                                               ║
@@ -993,6 +1066,10 @@ function disableFullyBookedDays(year, month, daysInMon, today, grid) {
 // ║  TIME SLOTS                                             ║
 // ╚══════════════════════════════════════════════════════════╝
 async function onDateClick(date) {
+  if (!bookingStartTracked) {
+    trackBookingAnalytics('booking_start', { booking_step: 'calendar_date_selection' });
+    bookingStartTracked = true;
+  }
   selectedDate = date;
   selectedTime = null;
   renderCalendar();
@@ -1195,6 +1272,9 @@ async function goToStripe() {
   btn.disabled = true;
 
   try {
+    // GA4 identifiers are read only after explicit analytics consent. If unavailable,
+    // booking/payment continues normally and no server-side purchase event is sent.
+    const analyticsContext = await getGa4BookingContext();
     const response = await fetch(`${CONFIG.apiBaseUrl}/api/create-checkout-session`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1207,6 +1287,7 @@ async function goToStripe() {
         lang: pendingBooking.lang,
         duration: CONFIG.sessionDurationMinutes,
         gdprConsent: document.getElementById('inp-gdpr').checked,
+        analytics: analyticsContext,
         requestId: pendingBooking.requestId,
       }),
     });
@@ -1214,6 +1295,14 @@ async function goToStripe() {
     if (!response.ok || !data.url) {
       const key = data.error === 'SLOT_UNAVAILABLE' ? 'paymentSlotUnavailable' : 'paymentInitError';
       throw new Error(tr(key));
+    }
+    if (!beginCheckoutTracked) {
+      trackBookingAnalytics('begin_checkout', {
+        currency: pendingBooking.currency,
+        value: Number(pendingBooking.price),
+        items: [{ item_id: 'service_60min', price: Number(pendingBooking.price), quantity: 1 }],
+      });
+      beginCheckoutTracked = true;
     }
     window.location.assign(data.url);
   } catch (error) {
