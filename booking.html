@@ -484,6 +484,13 @@
         <label><span data-t="labelPhone"></span></label>
         <input type="tel" id="inp-phone" autocomplete="tel" inputmode="tel">
       </div>
+      <div class="field" id="f-consultation-language">
+        <label><span data-t="labelConsultationLanguage"></span><span class="required">*</span></label>
+        <select id="inp-consultation-language">
+          <option value="pl" data-t="languagePolish"></option>
+          <option value="ru" data-t="languageRussian"></option>
+        </select>
+      </div>
     </div>
 
     <div class="card">
@@ -635,6 +642,9 @@ const T = {
     labelName:        "Imię i nazwisko",
     labelEmail:       "Adres e-mail",
     labelPhone:       "Numer telefonu (opcjonalnie)",
+    labelConsultationLanguage: "W jakim języku chcesz odbyć konsultację?",
+    languagePolish: "Polski",
+    languageRussian: "Rosyjski",
     labelProblem:     "Jeśli chcesz, opisz krótko cel spotkania (opcjonalnie; odpowiedź nie jest zapisywana w systemie rezerwacji).",
     labelSessionType: "Rodzaj sesji (opcjonalnie)",
     labelTime:        "Wybierz godzinę",
@@ -703,6 +713,9 @@ const T = {
     labelName:        "Имя и фамилия",
     labelEmail:       "Электронная почта",
     labelPhone:       "Номер телефона (необязательно)",
+    labelConsultationLanguage: "На каком языке ты хочешь провести консультацию?",
+    languagePolish: "Польский",
+    languageRussian: "Русский",
     labelProblem:     "Если хочешь, кратко опиши цель встречи (необязательно; ответ не сохраняется в системе записи).",
     labelSessionType: "Тип сессии (необязательно)",
     labelTime:        "Выбери время",
@@ -776,6 +789,9 @@ let bookingStartTracked = false;
 let beginCheckoutTracked = false;
 
 const GA4_MEASUREMENT_ID = 'G-CV5LW1GYMK';
+const initialBookingParams = new URLSearchParams(window.location.search);
+const landingPageLanguage = ['pl', 'ru'].includes(initialBookingParams.get('landing_lang'))
+  ? initialBookingParams.get('landing_lang') : 'unknown';
 
 function trackBookingAnalytics(eventName, parameters = {}) {
   if (!window.bookingGaConsentGranted || typeof window.gtag !== 'function') return;
@@ -1067,7 +1083,7 @@ function disableFullyBookedDays(year, month, daysInMon, today, grid) {
 // ╚══════════════════════════════════════════════════════════╝
 async function onDateClick(date) {
   if (!bookingStartTracked) {
-    trackBookingAnalytics('booking_start', { booking_step: 'calendar_date_selection' });
+    trackBookingAnalytics('booking_start', { booking_step: 'calendar_date_selection', booking_ui_language: lang, landing_page_language: landingPageLanguage, consultation_language: document.getElementById('inp-consultation-language')?.value || lang });
     bookingStartTracked = true;
   }
   selectedDate = date;
@@ -1231,6 +1247,8 @@ function submitForm() {
     price:        CONFIG.sessionPrice,
     currency:     CONFIG.currency,
     lang,
+    consultationLanguage: document.getElementById('inp-consultation-language').value,
+    landingPageLanguage,
     ts:           Date.now(),
     requestId:    (window.crypto && typeof window.crypto.randomUUID === 'function')
       ? window.crypto.randomUUID() : `bkreq_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`,
@@ -1285,6 +1303,8 @@ async function goToStripe() {
         date: pendingBooking.date,
         time: pendingBooking.time,
         lang: pendingBooking.lang,
+        consultationLanguage: pendingBooking.consultationLanguage,
+        landingPageLanguage: pendingBooking.landingPageLanguage,
         duration: CONFIG.sessionDurationMinutes,
         gdprConsent: document.getElementById('inp-gdpr').checked,
         analytics: analyticsContext,
@@ -1301,6 +1321,9 @@ async function goToStripe() {
         currency: pendingBooking.currency,
         value: Number(pendingBooking.price),
         items: [{ item_id: 'service_60min', price: Number(pendingBooking.price), quantity: 1 }],
+        booking_ui_language: pendingBooking.lang,
+        landing_page_language: pendingBooking.landingPageLanguage,
+        consultation_language: pendingBooking.consultationLanguage,
       });
       beginCheckoutTracked = true;
     }
@@ -1494,6 +1517,8 @@ function typeLabel(key) {
 window.addEventListener('load', () => {
   lang = detectLang();
   setLang(lang);
+  const consultationLanguageSelect = document.getElementById('inp-consultation-language');
+  if (consultationLanguageSelect) consultationLanguageSelect.value = lang;
   initCalendar();
   prefetchMonth(calYear, calMonth).then(() => renderCalendar());
   if (!handleUrlParams()) showScreen('form');
