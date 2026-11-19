@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow">
+<title>Potwierdzenie zgody / Подтверждение согласия</title>
+<style>
+:root{color-scheme:light;--ink:#26332d;--muted:#64736a;--accent:#527d68;--line:#dce5df;--bg:#f5f8f5}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:680px;margin:40px auto;padding:28px;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 8px 32px #26332d0d}
+h1{font-size:1.5rem;line-height:1.3;margin-top:0}h2{font-size:1.05rem;margin-bottom:8px}
+.muted{color:var(--muted)}.details{background:#f7faf7;border:1px solid var(--line);padding:16px;border-radius:10px;margin:18px 0}
+.row{display:flex;justify-content:space-between;gap:20px;padding:5px 0;border-bottom:1px solid var(--line)}.row:last-child{border:0}
+a{color:var(--accent)}label{display:flex;gap:12px;align-items:flex-start;margin:22px 0}
+input{margin-top:6px;width:19px;height:19px;flex:none}button{border:0;border-radius:9px;padding:13px 20px;background:var(--accent);color:#fff;font-weight:650;font-size:1rem;cursor:pointer}
+button:disabled{opacity:.5;cursor:not-allowed}.token{overflow-wrap:anywhere;padding:14px;background:#f3f6f4;border:1px dashed var(--accent);border-radius:8px;font: .95rem ui-monospace,monospace}
+.hidden{display:none}.error{color:#a22}.success{color:#286444}
+@media(max-width:600px){main{margin:12px;padding:20px}.row{display:block}.row strong{display:block}}
+</style>
+</head>
+<body>
+<main>
+<div id="loading">Loading… / Загрузка…</div>
+<section id="content" class="hidden">
+<h1 id="heading"></h1>
+<p id="intro" class="muted"></p>
+<div class="details" id="details"></div>
+<p><a id="rules" target="_blank" rel="noopener noreferrer"></a></p>
+<p><a id="privacy" target="_blank" rel="noopener noreferrer"></a></p>
+<label><input type="checkbox" id="accepted"><span id="consentText"></span></label>
+<button id="confirm" disabled></button>
+<p id="message" role="status"></p>
+<section id="issued" class="hidden">
+<h2 id="tokenHeading"></h2>
+<p id="tokenInfo" class="muted"></p>
+<div class="token" id="token"></div>
+<p><button id="copy" type="button"></button></p>
+</section>
+</section>
+</main>
+<script>
+(() => {
+  const API = 'https://booking-backend-kappa-drab.vercel.app/api/agent-consent';
+  const params = new URLSearchParams(location.search);
+  const pendingToken = params.get('token') || '';
+  const $ = id => document.getElementById(id);
+  let language = 'pl';
+  const t = {
+    pl: {
+      heading:'Potwierdzenie danych i zgody',intro:'Sprawdź, czy poniższe dane rezerwacji są prawidłowe. Żadne spotkanie nie zostanie jeszcze zarezerwowane ani opłacone.',
+      name:'Imię i nazwisko',email:'E-mail',date:'Data',time:'Godzina',consultation:'Język konsultacji',duration:'Czas trwania',price:'Cena',
+      rules:'Przeczytałam/em i akceptuję zasady rezerwacji oraz anulowania.',privacy:'Zapoznałam/em się z polityką prywatności.',
+      consent:'Potwierdzam, że podane dane są moje i świadomie wyrażam zgodę na przetwarzanie danych w celu obsługi rezerwacji, płatności i organizacji konsultacji, zgodnie z informacjami w polityce prywatności.',
+      confirm:'Potwierdzam dane i zgodę',loading:'Weryfikowanie linku…',expired:'Link jest nieprawidłowy, został użyty lub wygasł. Poproś asystenta o wysłanie nowego.',error:'Nie udało się potwierdzić zgody. Spróbuj ponownie lub poproś o nowy link.',
+      issued:'Zgoda została potwierdzona',tokenInfo:'Skopiuj ten jednorazowy token i wklej go w rozmowie z asystentem, który pomaga Ci w rezerwacji. Token jest ważny przez 30 minut i działa wyłącznie dla pokazanych wyżej danych.',
+      copy:'Kopiuj token',copied:'Skopiowano',consentLink:'Zasady rezerwacji',privacyLink:'Polityka prywatności',pl:'Polski',ru:'Rosyjski',min:'60 minut'
+    },
+    ru: {
+      heading:'Подтверждение данных и согласия',intro:'Проверьте правильность данных записи. На этом этапе встреча ещё не бронируется и оплата не производится.',
+      name:'Имя и фамилия',email:'Электронная почта',date:'Дата',time:'Время',consultation:'Язык консультации',duration:'Продолжительность',price:'Стоимость',
+      rules:'Я ознакомился/ознакомилась и принимаю правила записи и отмены.',privacy:'Я ознакомился/ознакомилась с политикой конфиденциальности.',
+      consent:'Подтверждаю, что указанные данные принадлежат мне, и осознанно даю согласие на обработку персональных данных для организации записи, оплаты и консультации в соответствии с политикой конфиденциальности.',
+      confirm:'Подтвердить данные и согласие',loading:'Проверяем ссылку…',expired:'Ссылка недействительна, уже использована или срок её действия истёк. Попросите ассистента отправить новую.',
+      error:'Не удалось подтвердить согласие. Попробуйте ещё раз или запросите новую ссылку.',issued:'Согласие подтверждено',
+      tokenInfo:'Скопируйте одноразовый токен и отправьте его ассистенту, который помогает с записью. Токен действует 30 минут и привязан только к указанным выше данным.',
+      copy:'Скопировать токен',copied:'Скопировано',consentLink:'Правила записи',privacyLink:'Политика конфиденциальности',pl:'Польский',ru:'Русский',min:'60 минут'
+    }
+  };
+  function setText(id,value){$(id).textContent=value;}
+  function showError(message){$('loading').textContent=message;$('loading').className='error';}
+  function addRow(label,value){const row=document.createElement('div');row.className='row';const a=document.createElement('span');a.textContent=label;const b=document.createElement('strong');b.textContent=value;row.append(a,b);$('details').append(row);}
+  async function init(){
+    if(!/^[A-Za-z0-9_-]{40,60}$/.test(pendingToken)){showError('Invalid or expired link / Неверная или просроченная ссылка');return;}
+    try{
+      const response=await fetch(API+'?token='+encodeURIComponent(pendingToken),{cache:'no-store',referrerPolicy:'no-referrer'});
+      const data=await response.json();
+      if(!response.ok||!data.booking)throw new Error('expired');
+      language=data.booking.interfaceLanguage==='ru'?'ru':'pl';
+      const x=t[language],b=data.booking;
+      document.documentElement.lang=language;
+      setText('heading',x.heading);setText('intro',x.intro);
+      addRow(x.name,b.name);addRow(x.email,b.email);addRow(x.date,b.date);addRow(x.time,b.time+' (Europe/Warsaw)');
+      addRow(x.consultation,b.consultationLanguage==='ru'?x.ru:x.pl);addRow(x.duration,x.min);addRow(x.price,b.price+' '+b.currency);
+      $('rules').href=data.rulesUrl;setText('rules',x.consentLink);
+      $('privacy').href=data.privacyUrl;setText('privacy',x.privacyLink);
+      setText('consentText',x.consent);setText('confirm',x.confirm);
+      $('accepted').addEventListener('change',()=>{$('confirm').disabled=!$('accepted').checked;});
+      $('confirm').addEventListener('click',confirm);
+      $('copy').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('token').textContent);setText('copy',x.copied);}catch{setText('copy',x.copy);}});
+      $('loading').className='hidden';$('content').className='';
+    }catch(e){showError(t.pl.expired+' / '+t.ru.expired);}
+  }
+  async function confirm(){
+    $('confirm').disabled=true;setText('message',t[language].loading);
+    try{
+      const response=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',referrerPolicy:'no-referrer',
+        body:JSON.stringify({action:'confirm',pendingToken,accepted:true})});
+      const data=await response.json();
+      if(!response.ok||!data.consentToken)throw new Error('confirm');
+      setText('heading',t[language].issued);setText('message','');
+      setText('tokenHeading',t[language].issued);setText('tokenInfo',t[language].tokenInfo);
+      setText('token',data.consentToken);setText('copy',t[language].copy);
+      $('issued').className='';$('confirm').className='hidden';$('accepted').disabled=true;
+      history.replaceState(null,'',location.pathname);
+    }catch(e){setText('message',t[language].error);$('message').className='error';$('confirm').disabled=false;}
+  }
+  init();
+})();
+</script>
+</body>
+</html>
