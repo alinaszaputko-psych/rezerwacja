@@ -44,8 +44,21 @@ button:disabled{opacity:.5;cursor:not-allowed}.token{overflow-wrap:anywhere;padd
 </main>
 <script>
 (() => {
-  const API = 'https://booking-backend-kappa-drab.vercel.app/api/agent-consent';
   const params = new URLSearchParams(location.search);
+  function resolveApiUrl() {
+    const candidate = params.get('api') || 'https://booking-backend-kappa-drab.vercel.app/api/agent-checkout';
+    const url = new URL(candidate);
+    const host = url.hostname.toLowerCase();
+    const previewHost = /^booking-backend-[a-z0-9-]+-alinaszaputko-psychs-projects\.vercel\.app$/.test(host);
+    const productionHost = host === 'booking-backend-kappa-drab.vercel.app';
+    if (url.protocol !== 'https:' || url.username || url.password || url.port || url.search || url.hash ||
+        url.pathname !== '/api/agent-checkout' || !(productionHost || previewHost)) {
+      throw new Error('Untrusted confirmation API address.');
+    }
+    return url.toString();
+  }
+  let API = '';
+  try { API = resolveApiUrl(); } catch { /* Show a generic error below. */ }
   const pendingToken = params.get('token') || '';
   const $ = id => document.getElementById(id);
   let language = 'pl';
@@ -74,6 +87,7 @@ button:disabled{opacity:.5;cursor:not-allowed}.token{overflow-wrap:anywhere;padd
   function showError(message){$('loading').textContent=message;$('loading').className='error';}
   function addRow(label,value){const row=document.createElement('div');row.className='row';const a=document.createElement('span');a.textContent=label;const b=document.createElement('strong');b.textContent=value;row.append(a,b);$('details').append(row);}
   async function init(){
+    if(!API){showError('Invalid confirmation link / Неверная ссылка');return;}
     if(!/^[A-Za-z0-9_-]{40,60}$/.test(pendingToken)){showError('Invalid or expired link / Неверная или просроченная ссылка');return;}
     try{
       const response=await fetch(API+'?token='+encodeURIComponent(pendingToken),{cache:'no-store',referrerPolicy:'no-referrer'});
@@ -98,7 +112,7 @@ button:disabled{opacity:.5;cursor:not-allowed}.token{overflow-wrap:anywhere;padd
     $('confirm').disabled=true;setText('message',t[language].loading);
     try{
       const response=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',referrerPolicy:'no-referrer',
-        body:JSON.stringify({action:'confirm',pendingToken,accepted:true})});
+        body:JSON.stringify({action:'confirm',pendingToken,accepted:$('accepted').checked,rulesAccepted:$('rulesAccepted').checked,privacyAccepted:$('privacyAccepted').checked})});
       const data=await response.json();
       if(!response.ok||!data.consentToken)throw new Error('confirm');
       setText('heading',t[language].issued);setText('message','');
