@@ -29,6 +29,8 @@ button:disabled{opacity:.5;cursor:not-allowed}.token{overflow-wrap:anywhere;padd
 <div class="details" id="details"></div>
 <p><a id="rules" target="_blank" rel="noopener noreferrer"></a></p>
 <p><a id="privacy" target="_blank" rel="noopener noreferrer"></a></p>
+<label><input type="checkbox" id="rulesAccepted"><span id="rulesText"></span></label>
+<label><input type="checkbox" id="privacyAccepted"><span id="privacyText"></span></label>
 <label><input type="checkbox" id="accepted"><span id="consentText"></span></label>
 <button id="confirm" disabled></button>
 <p id="message" role="status"></p>
@@ -51,7 +53,7 @@ button:disabled{opacity:.5;cursor:not-allowed}.token{overflow-wrap:anywhere;padd
     pl: {
       heading:'Potwierdzenie danych i zgody',intro:'Sprawdź, czy poniższe dane rezerwacji są prawidłowe. Żadne spotkanie nie zostanie jeszcze zarezerwowane ani opłacone.',
       name:'Imię i nazwisko',email:'E-mail',date:'Data',time:'Godzina',consultation:'Język konsultacji',duration:'Czas trwania',price:'Cena',
-      rules:'Przeczytałam/em i akceptuję zasady rezerwacji oraz anulowania.',privacy:'Zapoznałam/em się z polityką prywatności.',
+      rules:'Przeczytałam/em i akceptuję zasady rezerwacji oraz anulowania.',rulesText:'Potwierdzam, że zapoznałam/em się z zasadami rezerwacji i anulowania i je akceptuję.',privacy:'Zapoznałam/em się z polityką prywatności.',privacyText:'Potwierdzam, że zapoznałam/em się z polityką prywatności.',
       consent:'Potwierdzam, że podane dane są moje i świadomie wyrażam zgodę na przetwarzanie danych w celu obsługi rezerwacji, płatności i organizacji konsultacji, zgodnie z informacjami w polityce prywatności.',
       confirm:'Potwierdzam dane i zgodę',loading:'Weryfikowanie linku…',expired:'Link jest nieprawidłowy, został użyty lub wygasł. Poproś asystenta o wysłanie nowego.',error:'Nie udało się potwierdzić zgody. Spróbuj ponownie lub poproś o nowy link.',
       issued:'Zgoda została potwierdzona',tokenInfo:'Skopiuj ten jednorazowy token i wklej go w rozmowie z asystentem, który pomaga Ci w rezerwacji. Token jest ważny przez 30 minut i działa wyłącznie dla pokazanych wyżej danych.',
@@ -60,7 +62,7 @@ button:disabled{opacity:.5;cursor:not-allowed}.token{overflow-wrap:anywhere;padd
     ru: {
       heading:'Подтверждение данных и согласия',intro:'Проверьте правильность данных записи. На этом этапе встреча ещё не бронируется и оплата не производится.',
       name:'Имя и фамилия',email:'Электронная почта',date:'Дата',time:'Время',consultation:'Язык консультации',duration:'Продолжительность',price:'Стоимость',
-      rules:'Я ознакомился/ознакомилась и принимаю правила записи и отмены.',privacy:'Я ознакомился/ознакомилась с политикой конфиденциальности.',
+      rules:'Я ознакомился/ознакомилась и принимаю правила записи и отмены.',rulesText:'Подтверждаю, что ознакомился/ознакомилась с правилами записи и отмены и принимаю их.',privacy:'Я ознакомился/ознакомилась с политикой конфиденциальности.',privacyText:'Подтверждаю, что ознакомился/ознакомилась с политикой конфиденциальности.',
       consent:'Подтверждаю, что указанные данные принадлежат мне, и осознанно даю согласие на обработку персональных данных для организации записи, оплаты и консультации в соответствии с политикой конфиденциальности.',
       confirm:'Подтвердить данные и согласие',loading:'Проверяем ссылку…',expired:'Ссылка недействительна, уже использована или срок её действия истёк. Попросите ассистента отправить новую.',
       error:'Не удалось подтвердить согласие. Попробуйте ещё раз или запросите новую ссылку.',issued:'Согласие подтверждено',
@@ -86,7 +88,7 @@ button:disabled{opacity:.5;cursor:not-allowed}.token{overflow-wrap:anywhere;padd
       $('rules').href=data.rulesUrl;setText('rules',x.consentLink);
       $('privacy').href=data.privacyUrl;setText('privacy',x.privacyLink);
       setText('consentText',x.consent);setText('confirm',x.confirm);
-      $('accepted').addEventListener('change',()=>{$('confirm').disabled=!$('accepted').checked;});
+      ['accepted','rulesAccepted','privacyAccepted'].forEach(id=>$(id).addEventListener('change',()=>{$('confirm').disabled=!( $('accepted').checked && $('rulesAccepted').checked && $('privacyAccepted').checked );}));
       $('confirm').addEventListener('click',confirm);
       $('copy').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('token').textContent);setText('copy',x.copied);}catch{setText('copy',x.copy);}});
       $('loading').className='hidden';$('content').className='';
