@@ -85,8 +85,8 @@ button:disabled{opacity:.5;cursor:not-allowed}.token{overflow-wrap:anywhere;padd
       setText('heading',x.heading);setText('intro',x.intro);
       addRow(x.name,b.name);addRow(x.email,b.email);addRow(x.date,b.date);addRow(x.time,b.time+' (Europe/Warsaw)');
       addRow(x.consultation,b.consultationLanguage==='ru'?x.ru:x.pl);addRow(x.duration,x.min);addRow(x.price,b.price+' '+b.currency);
-      $('rules').href=data.rulesUrl;setText('rules',x.consentLink);
-      $('privacy').href=data.privacyUrl;setText('privacy',x.privacyLink);
+      $('rules').href=data.rulesUrl;setText('rules',x.consentLink);setText('rulesText',x.rulesText);
+      $('privacy').href=data.privacyUrl;setText('privacy',x.privacyLink);setText('privacyText',x.privacyText);
       setText('consentText',x.consent);setText('confirm',x.confirm);
       ['accepted','rulesAccepted','privacyAccepted'].forEach(id=>$(id).addEventListener('change',()=>{$('confirm').disabled=!( $('accepted').checked && $('rulesAccepted').checked && $('privacyAccepted').checked );}));
       $('confirm').addEventListener('click',confirm);
